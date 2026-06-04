@@ -1,241 +1,360 @@
-import { config, state, dividerRegex, log, saveToPreset } from './state.js';
+/**
+ * Core rendering: scans prompt list, identifies headers, creates groups.
+ * Uses 日月西's synthetic-header approach (not <details> wrapping).
+ */
 
-let _saveTimer = null;
-function debouncedSave() {
-    clearTimeout(_saveTimer);
-    _saveTimer = setTimeout(() => saveToPreset().catch(console.error), 1500);
+const SELECTORS = {
+    list: '#completion_prompt_manager_list',
+    item: 'li.completion_prompt_manager_prompt',
+    listHead: 'li.completion_prompt_manager_list_head',
+    name: 'a.prompt-manager-inspect-action',
+};
+
+const CLASSES = {
+    root: 'ryx-grouping-root',
+    header: 'ryx-group-header',
+    caret: 'ryx-group-caret',
+    title: 'ryx-group-title',
+    count: 'ryx-group-count',
+    collapsed: 'is-collapsed',
+    itemCollapsed: 'ryx-group-item-collapsed',
+    toolsRow: 'ryx-head-tools-row',
+    toolsHost: 'ryx-name-tools-host',
+    toolsList: 'ryx-list-tools',
+    toolBtn: 'ryx-tool-btn',
+    toolLabel: 'ryx-tool-label',
+};
+
+// --- State ---
+let state = {
+    enabled: true,
+    // Manual mode: Set of prompt IDs that are headers
+    manualHeaders: new Set(),
+    // Divider-based mode: patterns that mark headers
+    dividerPatterns: ['=', '-', '#'],
+    // Collapsed groups: Set of group keys
+    collapsedGroups: new Set(),
+    // Current mode: 'manual' or 'divider'
+    mode: 'divider',
+};
+
+// Build regex from divider patterns
+function buildDividerRegex() {
+    const patterns = state.dividerPatterns
+        .map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`^(${patterns.join('|')})`);
 }
 
-// --- Extract text name from <a> tag ---
-function extractTextName(link) {
+// Check if an item is a header
+function isHeader(item, promptId, promptName) {
+    if (state.mode === 'manual') {
+        return state.manualHeaders.has(promptId);
+    }
+    // Divider mode: name starts with a divider pattern
+    return buildDividerRegex().test(promptName);
+}
+
+// Extract prompt name from item
+function getPromptName(item) {
+    const link = item.querySelector(SELECTORS.name);
+    if (!link) return '';
     const textNodes = Array.from(link.childNodes).filter(n => n.nodeType === 3);
     return textNodes.map(n => n.textContent).join('').trim();
 }
 
-// --- Check if LI is a header ---
-function getGroupHeaderInfo(promptItem) {
-  const link = promptItem.querySelector(config.selectors.promptLink);
-  if (!link) return null;
-
-  const itemId = promptItem.dataset.pmIdentifier;
-  const currentName = extractTextName(link);
-
-  const cachedName = state.originalNames.get(itemId);
-  if (cachedName !== currentName) {
-    log('Name changed for', itemId, ':', cachedName, '->', currentName);
-    state.originalNames.set(itemId, currentName);
-  }
-
-  const originalName = currentName;
-  const createInfo = (name) => ({ originalName: name, stableKey: itemId });
-
-  // Manual mode: check if item is selected as header
-  if (state.foldingMode === 'manual') {
-    return state.manualHeaders.has(itemId) ? createInfo(originalName) : null;
-  }
-
-  // Standard/sandwich mode: match divider symbols
-  return dividerRegex.test(originalName) ? createInfo(originalName) : null;
+// Get prompt ID from item
+function getPromptId(item) {
+    return item.dataset.pmIdentifier || '';
 }
 
-// --- Count child items in a group ---
-function countGroupItems(items) {
-  return items.filter(item => {
-    // Don't count the header itself or any nested headers
-    const info = getGroupHeaderInfo(item);
-    return !info;
-  }).length;
-}
+// --- Create a synthetic group header element ---
+function createHeader(groupName, itemCount, groupKey) {
+    const li = document.createElement('li');
+    li.className = CLASSES.header;
+    li.dataset.ryxGroupKey = groupKey;
+    li.setAttribute('role', 'button');
+    li.setAttribute('tabindex', '0');
+    li.setAttribute('aria-expanded', 'true');
 
-// --- Build Group DOM ---
-function createGroupDOM(headerItem, headerInfo, contentItems) {
-    const groupKey = headerInfo.stableKey;
-
-    // Record state
-    const childIds = contentItems.map(item => item.dataset.pmIdentifier).filter(Boolean);
-    state.groupHierarchy[groupKey] = childIds;
-    state.groupHeaderStatus[groupKey] = !headerItem.classList.contains('completion_prompt_manager_prompt_disabled');
-
-    // Mark header item
-    headerItem.classList.add(config.classNames.isGroupHeader);
-
-    // Create <details> container
-    const details = document.createElement('details');
-    details.className = config.classNames.group;
-    details.open = state.openGroups[groupKey] !== false;
-    details.dataset.groupKey = groupKey;
-
-    // Prevent native click on link
-    const link = headerItem.querySelector(config.selectors.promptLink);
-    if (link) {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, true);
+    if (state.collapsedGroups.has(groupKey)) {
+        li.classList.add(CLASSES.collapsed);
+        li.setAttribute('aria-expanded', 'false');
     }
 
-    // Click on name span toggles fold
-    const nameSpan = headerItem.querySelector(config.selectors.promptNameSpan);
-    if (nameSpan) {
-        nameSpan.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            details.open = !details.open;
-        }, true);
-    }
+    // Caret (▼ / ▶)
+    const caret = document.createElement('span');
+    caret.className = CLASSES.caret;
+    caret.innerHTML = '&#9654;'; // ▶ (rotates to ▼ when expanded)
+    li.appendChild(caret);
 
-    // Build summary (clickable header row)
-    const summary = document.createElement('summary');
-    summary.onclick = (e) => {
-        if (e.target === summary) {
-            e.preventDefault();
-            details.open = !details.open;
+    // Title
+    const title = document.createElement('span');
+    title.className = CLASSES.title;
+    title.textContent = groupName;
+    li.appendChild(title);
+
+    // Item count badge
+    const count = document.createElement('span');
+    count.className = CLASSES.count;
+    count.textContent = String(itemCount);
+    li.appendChild(count);
+
+    // Click to toggle
+    const toggle = () => {
+        const isCollapsed = li.classList.toggle(CLASSES.collapsed);
+        li.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        if (isCollapsed) {
+            state.collapsedGroups.add(groupKey);
+        } else {
+            state.collapsedGroups.delete(groupKey);
         }
-    };
-    summary.appendChild(headerItem);
-    details.appendChild(summary);
-
-    // Build content area
-    const contentDiv = document.createElement('div');
-    contentDiv.className = config.classNames.groupContent;
-    contentItems.forEach(item => contentDiv.appendChild(item));
-    details.appendChild(contentDiv);
-
-    // Listen for open/close
-    details.ontoggle = () => {
-        state.openGroups[groupKey] = details.open;
-        debouncedSave();
+        // Update children visibility
+        updateChildren(li, groupKey, isCollapsed);
+        saveState();
     };
 
-    return details;
+    li.addEventListener('click', toggle);
+    li.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle();
+        }
+    });
+
+    return li;
 }
 
-// --- Main function: rebuild list with groups ---
-export function buildCollapsibleGroups(listContainer) {
-  log('Building collapsible groups, mode:', state.foldingMode);
+// Update children visibility based on collapse state
+function updateChildren(header, groupKey, isCollapsed) {
+    const list = document.querySelector(SELECTORS.list);
+    if (!list) return;
 
-  if (!listContainer || state.isProcessing) return;
-  state.isProcessing = true;
+    // Find all items with this group key and toggle their visibility
+    const items = list.querySelectorAll(`li.completion_prompt_manager_prompt[data-ryx-group="${groupKey}"]`);
+    items.forEach(item => {
+        item.classList.toggle(CLASSES.itemCollapsed, isCollapsed);
+    });
+}
 
-  try {
-    // Add grouping root class for CSS variable scoping
-    listContainer.classList.add(config.classNames.groupingRoot);
+// --- Main rebuild function ---
+export function rebuild() {
+    const list = document.querySelector(SELECTORS.list);
+    if (!list) return;
 
-    // 1. Get all items, reset to clean state
-    const allItems = Array.from(listContainer.querySelectorAll(config.selectors.promptListItem));
+    // Add root class for CSS variables
+    list.classList.add(CLASSES.root);
+
+    // Remove existing headers and toolbar
+    list.querySelectorAll(`.${CLASSES.header}`).forEach(h => h.remove());
+    list.querySelectorAll(`.${CLASSES.toolsRow}`).forEach(r => r.remove());
+
+    // Get all prompt items (excluding list-head)
+    const allItems = Array.from(list.querySelectorAll(SELECTORS.item));
+    if (allItems.length === 0) return;
+
+    // Clear previous group assignments
+    allItems.forEach(item => {
+        item.classList.remove(CLASSES.itemCollapsed);
+        delete item.dataset.ryxGroup;
+    });
+
+    if (!state.enabled) return;
+
+    // First pass: identify headers and build groups
+    const groups = [];
+    let currentGroup = null;
 
     allItems.forEach(item => {
-      item.classList.remove(config.classNames.isGroupHeader);
-      const itemId = item.dataset.pmIdentifier;
-      const link = item.querySelector(config.selectors.promptLink);
-      if (link && itemId) {
-        const currentName = extractTextName(link);
-        state.originalNames.set(itemId, currentName);
-      }
+        const id = getPromptId(item);
+        const name = getPromptName(item);
+
+        if (isHeader(item, id, name)) {
+            // Start a new group
+            currentGroup = { name, key: id, items: [] };
+            groups.push(currentGroup);
+        } else if (currentGroup) {
+            // Add to current group
+            currentGroup.items.push(item);
+        }
+        // If no current group and item is not a header, it stays ungrouped
     });
 
-    // 2. Clear and reset state
-    listContainer.innerHTML = '';
-    state.groupHierarchy = {};
-    state.groupHeaderStatus = {};
+    if (groups.length === 0) return;
 
-    // 3. If disabled, just put items back
-    if (!state.isEnabled) {
-      allItems.forEach(item => listContainer.appendChild(item));
-      listContainer.classList.remove(config.classNames.groupingRoot);
-      return;
+    // Second pass: insert headers and mark children
+    const insertBeforeMap = new Map(); // groupKey -> reference element
+
+    groups.forEach(group => {
+        if (group.items.length === 0) return;
+
+        const firstChild = group.items[0];
+        const groupKey = group.key;
+
+        // Mark all items in this group
+        group.items.forEach(item => {
+            item.dataset.ryxGroup = groupKey;
+        });
+
+        // Create header and insert before first child
+        const header = createHeader(group.name, group.items.length, groupKey);
+        insertBeforeMap.set(groupKey, { header, before: firstChild });
+    });
+
+    // Insert headers (reverse order to maintain positions)
+    const entries = [...insertBeforeMap.values()].reverse();
+    entries.forEach(({ header, before }) => {
+        list.insertBefore(header, before);
+    });
+
+    // Apply collapse state
+    groups.forEach(group => {
+        if (state.collapsedGroups.has(group.key)) {
+            group.items.forEach(item => {
+                item.classList.add(CLASSES.itemCollapsed);
+            });
+        }
+    });
+
+    // Insert or update toolbar
+    insertToolbar(list);
+}
+
+// --- Toolbar ---
+function insertToolbar(list) {
+    const listHead = list.querySelector(SELECTORS.listHead);
+    if (!listHead) return;
+
+    // Remove existing
+    list.querySelectorAll(`.${CLASSES.toolsRow}`).forEach(r => r.remove());
+
+    const row = document.createElement('li');
+    row.className = CLASSES.toolsRow;
+
+    const host = document.createElement('span');
+    host.className = CLASSES.toolsHost;
+
+    const tools = document.createElement('span');
+    tools.className = CLASSES.toolsList;
+
+    // Expand All button
+    tools.appendChild(makeToolBtn('展开全部', 'ryx_expand_all', () => expandAll()));
+
+    // Collapse All button
+    tools.appendChild(makeToolBtn('收起全部', 'ryx_collapse_all', () => collapseAll()));
+
+    // Toggle on/off button
+    tools.appendChild(makeToolBtn(state.enabled ? '分组: 开' : '分组: 关', 'ryx_toggle_grouping', () => {
+        state.enabled = !state.enabled;
+        saveState();
+        rebuild();
+    }));
+
+    host.appendChild(tools);
+    row.appendChild(host);
+    list.insertBefore(row, listHead.nextSibling);
+}
+
+function makeToolBtn(label, action, onClick) {
+    const btn = document.createElement('button');
+    btn.className = CLASSES.toolBtn;
+    btn.dataset.action = action;
+    btn.type = 'button';
+
+    const span = document.createElement('span');
+    span.className = CLASSES.toolLabel;
+    span.textContent = label;
+    btn.appendChild(span);
+
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+
+function expandAll() {
+    state.collapsedGroups.clear();
+    document.querySelectorAll(`.${CLASSES.header}`).forEach(h => {
+        h.classList.remove(CLASSES.collapsed);
+        h.setAttribute('aria-expanded', 'true');
+    });
+    document.querySelectorAll(`.${CLASSES.itemCollapsed}`).forEach(item => {
+        item.classList.remove(CLASSES.itemCollapsed);
+    });
+    saveState();
+}
+
+function collapseAll() {
+    document.querySelectorAll(`.${CLASSES.header}`).forEach(h => {
+        const key = h.dataset.ryxGroupKey;
+        if (key) state.collapsedGroups.add(key);
+        h.classList.add(CLASSES.collapsed);
+        h.setAttribute('aria-expanded', 'false');
+    });
+    document.querySelectorAll(`li.completion_prompt_manager_prompt[data-ryx-group]`).forEach(item => {
+        item.classList.add(CLASSES.itemCollapsed);
+    });
+    saveState();
+}
+
+// --- Persistence (localStorage) ---
+const STORAGE_KEY = 'ryx_prompt_folding';
+
+function saveState() {
+    try {
+        const data = {
+            enabled: state.enabled,
+            mode: state.mode,
+            manualHeaders: [...state.manualHeaders],
+            dividerPatterns: state.dividerPatterns,
+            collapsedGroups: [...state.collapsedGroups],
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.warn('[RYX] Failed to save state:', e);
     }
-
-    // --- Standard mode: split at each header ---
-    const buildStandardGroups = () => {
-      let buffer = [];
-      let currentHeader = null;
-      let currentHeaderInfo = null;
-
-      const flushBuffer = () => {
-        if (currentHeader) {
-            listContainer.appendChild(createGroupDOM(currentHeader, currentHeaderInfo, buffer));
-        } else {
-            buffer.forEach(i => listContainer.appendChild(i));
-        }
-        buffer = [];
-      };
-
-      allItems.forEach(item => {
-        const info = getGroupHeaderInfo(item);
-        if (info) {
-          flushBuffer();
-          currentHeader = item;
-          currentHeaderInfo = info;
-        } else {
-          buffer.push(item);
-        }
-      });
-      flushBuffer();
-    };
-
-    // --- Sandwich mode: A...A pairing ---
-    const buildSandwichGroups = () => {
-      let remaining = [...allItems];
-
-      while (remaining.length > 0) {
-        const current = remaining.shift();
-        const info = getGroupHeaderInfo(current);
-
-        if (!info) {
-          listContainer.appendChild(current);
-          continue;
-        }
-
-        const closerIdx = remaining.findIndex(item => {
-            const otherInfo = getGroupHeaderInfo(item);
-            return otherInfo && otherInfo.originalName === info.originalName;
-        });
-
-        if (closerIdx !== -1) {
-          const groupContent = remaining.splice(0, closerIdx + 1);
-          listContainer.appendChild(createGroupDOM(current, info, groupContent));
-        } else {
-          listContainer.appendChild(current);
-        }
-      }
-    };
-
-    state.foldingMode === 'sandwich' ? buildSandwichGroups() : buildStandardGroups();
-
-    // Apply disabled styles
-    applyGroupDisabledStyles(listContainer);
-
-    log('Groups built, total groups:', Object.keys(state.groupHierarchy).length);
-
-  } catch (err) {
-    console.error('[PF] Build failed:', err);
-  } finally {
-    state.isProcessing = false;
-  }
 }
 
-// --- Expand/Collapse all ---
-export function toggleAllGroups(listContainer, shouldOpen) {
-  const details = listContainer.querySelectorAll(`.${config.classNames.group}`);
-  details.forEach(el => {
-      el.open = shouldOpen;
-      state.openGroups[el.dataset.groupKey] = shouldOpen;
-  });
-  saveToPreset().catch(console.error);
+function loadState() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        state.enabled = data.enabled ?? true;
+        state.mode = data.mode ?? 'divider';
+        state.manualHeaders = new Set(data.manualHeaders || []);
+        state.dividerPatterns = data.dividerPatterns || ['=', '-', '#'];
+        state.collapsedGroups = new Set(data.collapsedGroups || []);
+    } catch (e) {
+        console.warn('[RYX] Failed to load state:', e);
+    }
 }
 
-// --- Apply disabled group visual styles ---
-function applyGroupDisabledStyles(listContainer) {
-    listContainer.querySelectorAll(`.${config.classNames.group}`).forEach(group => {
-        const key = group.dataset.groupKey;
-        if (!key) return;
+// --- Public API ---
+export function init() {
+    loadState();
+    rebuild();
+}
 
-        const isDisabled = state.groupHeaderStatus[key] === false;
-        const contentItems = group.querySelectorAll(`.${config.classNames.groupContent} > li`);
+export function getState() { return state; }
 
-        contentItems.forEach(item => {
-            item.classList.toggle(config.classNames.disabledByGroup, isDisabled);
-        });
-    });
+export function setMode(mode) {
+    state.mode = mode;
+    saveState();
+    rebuild();
+}
+
+export function setDividerPatterns(patterns) {
+    state.dividerPatterns = patterns;
+    saveState();
+    rebuild();
+}
+
+export function setManualHeaders(ids) {
+    state.manualHeaders = new Set(ids);
+    saveState();
+    rebuild();
+}
+
+export function toggleEnabled() {
+    state.enabled = !state.enabled;
+    saveState();
+    rebuild();
 }
