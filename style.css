@@ -1,19 +1,20 @@
 /*
  * Riyuexi Prompt Folders
- * Prompt Manager folder UI with compact moon-style styling.
+ * Minimal prompt-manager folders with separate folder/item hierarchy.
  */
 
 :root {
-    --ryx-bg: color-mix(in srgb, var(--SmartThemeFastUIBGColor, #151319) 88%, #101015);
-    --ryx-surface: color-mix(in srgb, var(--SmartThemeBlurTintColor, #24202b) 78%, transparent);
-    --ryx-surface-strong: color-mix(in srgb, var(--SmartThemeBlurTintColor, #2a2533) 92%, #17151d);
-    --ryx-text: var(--SmartThemeBodyColor, #f4edf7);
-    --ryx-muted: color-mix(in srgb, var(--SmartThemeBodyColor, #f4edf7) 62%, transparent);
-    --ryx-border: color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 38%, transparent);
-    --ryx-accent: #d7b773;
-    --ryx-accent-soft: rgba(215, 183, 115, 0.18);
-    --ryx-blue: #84b7d8;
-    --ryx-danger: #d97b7b;
+    --ryx-bg: color-mix(in srgb, var(--SmartThemeFastUIBGColor, #121418) 92%, #0d0f12);
+    --ryx-panel: color-mix(in srgb, var(--SmartThemeBlurTintColor, #20242b) 72%, transparent);
+    --ryx-panel-strong: color-mix(in srgb, var(--SmartThemeBlurTintColor, #242932) 92%, #101215);
+    --ryx-text: var(--SmartThemeBodyColor, #eef2f5);
+    --ryx-muted: color-mix(in srgb, var(--SmartThemeBodyColor, #eef2f5) 58%, transparent);
+    --ryx-faint: color-mix(in srgb, var(--SmartThemeBodyColor, #eef2f5) 20%, transparent);
+    --ryx-border: color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 30%, transparent);
+    --ryx-accent: #72d6c5;
+    --ryx-accent-2: #9db7ff;
+    --ryx-warn: #f08c8c;
+    --ryx-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
 }
 
 .completion_prompt_manager_header {
@@ -26,12 +27,13 @@
 .ryx-folder-toolbar {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     margin-left: auto;
     padding: 3px;
     border: 1px solid var(--ryx-border);
     border-radius: 8px;
-    background: var(--ryx-surface);
+    background: color-mix(in srgb, var(--ryx-panel) 86%, transparent);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .ryx-toolbar-btn,
@@ -44,13 +46,13 @@
     align-items: center;
     justify-content: center;
     min-width: 30px;
-    height: 30px;
+    min-height: 30px;
     border: 1px solid transparent;
     border-radius: 7px;
-    color: var(--ryx-text);
+    color: var(--ryx-muted);
     background: transparent;
     cursor: pointer;
-    transition: background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, color 0.16s ease;
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
 }
 
 .ryx-toolbar-btn:hover,
@@ -60,9 +62,9 @@
 #ryx-folder-float-panel button:hover,
 .ryx-folder-chevron:hover,
 .ryx-toolbar-btn.is-active {
-    color: #fff;
-    border-color: color-mix(in srgb, var(--ryx-accent) 46%, transparent);
-    background: var(--ryx-accent-soft);
+    color: var(--ryx-text);
+    border-color: color-mix(in srgb, var(--ryx-accent) 42%, transparent);
+    background: color-mix(in srgb, var(--ryx-accent) 13%, transparent);
 }
 
 .ryx-toolbar-btn:active,
@@ -75,28 +77,32 @@
 }
 
 .ryx-toolbar-btn.is-off {
-    color: var(--ryx-muted);
+    color: color-mix(in srgb, var(--ryx-muted) 70%, transparent);
 }
 
-.ryx-organize {
+.ryx-organize,
+.ryx-enabled:not(.is-off) {
     color: var(--ryx-accent);
 }
 
 .ryx-prompt-folder {
     list-style: none !important;
-    margin: 3px 0 6px;
+    margin: 5px 0 7px;
     border-radius: 8px;
 }
 
 .ryx-folder-summary {
-    position: relative;
     display: flex;
     align-items: center;
-    gap: 4px;
-    min-height: 34px;
-    border: 1px solid color-mix(in srgb, var(--ryx-accent) 26%, transparent);
+    gap: 6px;
+    min-height: 36px;
+    padding: 2px 6px 2px 4px;
+    border: 1px solid color-mix(in srgb, var(--ryx-accent-2) 24%, var(--ryx-border));
     border-radius: 8px;
-    background: linear-gradient(90deg, rgba(215, 183, 115, 0.12), rgba(132, 183, 216, 0.06));
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--ryx-accent) 10%, transparent), transparent 52%),
+        color-mix(in srgb, var(--ryx-panel-strong) 92%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     list-style: none;
     user-select: none;
 }
@@ -106,42 +112,43 @@
     display: none;
 }
 
-.ryx-folder-summary::after {
-    content: attr(data-count);
-    min-width: 20px;
-    height: 20px;
-    margin-right: 8px;
-    padding: 0 6px;
-    border: 1px solid color-mix(in srgb, var(--ryx-accent) 30%, transparent);
-    border-radius: 999px;
-    color: var(--ryx-accent);
-    background: rgba(0, 0, 0, 0.16);
-    font-size: 12px;
-    line-height: 19px;
-    text-align: center;
+.ryx-folder-summary:hover {
+    border-color: color-mix(in srgb, var(--ryx-accent) 42%, var(--ryx-border));
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--ryx-accent) 14%, transparent), transparent 56%),
+        color-mix(in srgb, var(--ryx-panel-strong) 96%, transparent);
 }
 
 .ryx-folder-chevron {
     width: 24px;
     min-width: 24px;
-    height: 28px;
-    margin-left: 3px;
-    color: var(--ryx-accent);
+    min-height: 28px;
     border: none;
+    color: var(--ryx-accent);
+}
+
+.ryx-folder-chevron i {
+    transition: transform 170ms ease;
 }
 
 .ryx-prompt-folder[open] > .ryx-folder-summary .ryx-folder-chevron i {
     transform: rotate(90deg);
 }
 
-.ryx-folder-chevron i {
-    transition: transform 0.16s ease;
-}
-
 .ryx-folder-summary > li.completion_prompt_manager_prompt {
     flex: 1;
+    min-width: 0;
+    min-height: 30px;
     margin: 0 !important;
-    border-radius: 6px;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.ryx-folder-header span.completion_prompt_manager_prompt_name,
+.ryx-folder-header a.prompt-manager-inspect-action {
+    font-size: 13px !important;
+    font-weight: 650;
 }
 
 .ryx-folder-header .fa-asterisk {
@@ -151,11 +158,42 @@
     padding: 0 !important;
 }
 
+.ryx-folder-count {
+    flex: 0 0 auto;
+    min-width: 34px;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--ryx-accent) 28%, transparent);
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--ryx-text) 86%, var(--ryx-accent));
+    background: color-mix(in srgb, var(--ryx-accent) 11%, rgba(0, 0, 0, 0.18));
+    font-size: 11px;
+    line-height: 21px;
+    text-align: center;
+    white-space: nowrap;
+}
+
 .ryx-prompt-folder-content {
-    margin: 4px 0 2px 15px;
-    padding-left: 13px;
-    border-left: 1px solid color-mix(in srgb, var(--ryx-accent) 34%, transparent);
-    animation: ryxSlideDown 0.16s ease-out;
+    margin: 4px 0 2px 18px;
+    padding: 4px 0 4px 12px;
+    border-left: 1px solid color-mix(in srgb, var(--ryx-accent) 26%, transparent);
+}
+
+.ryx-prompt-folder-content > li.completion_prompt_manager_prompt {
+    min-height: 30px;
+    margin: 3px 0 !important;
+    border-radius: 7px !important;
+    background: color-mix(in srgb, var(--ryx-panel) 38%, transparent) !important;
+    transition: background 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+.ryx-prompt-folder-content > li.completion_prompt_manager_prompt:hover {
+    background: color-mix(in srgb, var(--ryx-accent-2) 10%, var(--ryx-panel)) !important;
+}
+
+.ryx-prompt-folder-content > li.completion_prompt_manager_prompt span.completion_prompt_manager_prompt_name,
+.ryx-prompt-folder-content > li.completion_prompt_manager_prompt a.prompt-manager-inspect-action {
+    font-size: 12px !important;
 }
 
 .ryx-prompt-folder-content:empty::after {
@@ -168,7 +206,12 @@
 
 .ryx-controlled-by-disabled-folder > span:not(.prompt_manager_prompt_tokens) {
     filter: grayscale(85%);
-    opacity: 0.55;
+    opacity: 0.52;
+}
+
+#completion_prompt_manager_list.ryx-is-dragging .ryx-prompt-folder-content,
+#completion_prompt_manager_list.ryx-is-dragging .ryx-folder-summary {
+    transition: none !important;
 }
 
 li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
@@ -193,7 +236,7 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
     padding: 0;
     color: var(--ryx-text);
     background: var(--ryx-bg);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--ryx-shadow);
 }
 
 .ryx-settings-shell {
@@ -212,21 +255,22 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
 
 .ryx-kicker {
     color: var(--ryx-accent);
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0;
     text-transform: uppercase;
 }
 
 .ryx-settings-head h3 {
     margin: 2px 0 0;
-    font-size: 17px;
+    font-size: 16px;
     line-height: 1.2;
     letter-spacing: 0;
 }
 
 .ryx-status-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.6fr) minmax(64px, 0.7fr) minmax(64px, 0.7fr);
     gap: 8px;
 }
 
@@ -235,7 +279,7 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
     padding: 8px 9px;
     border: 1px solid var(--ryx-border);
     border-radius: 8px;
-    background: var(--ryx-surface);
+    background: var(--ryx-panel);
 }
 
 .ryx-status-item span {
@@ -250,55 +294,63 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
     overflow: hidden;
     margin-top: 3px;
     color: var(--ryx-text);
-    font-size: 14px;
+    font-size: 13px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.ryx-action-row,
-.ryx-copy-row {
-    display: flex;
-    align-items: center;
+.ryx-action-stack {
+    display: grid;
     gap: 8px;
+}
+
+.ryx-action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.ryx-main-btn,
+.ryx-soft-btn {
+    gap: 7px;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
 }
 
 .ryx-main-btn {
-    flex: 1;
-    min-width: 0;
-    justify-content: center;
-    gap: 8px;
-    border-color: color-mix(in srgb, var(--ryx-accent) 42%, transparent);
-    color: #fff;
-    background: color-mix(in srgb, var(--ryx-accent) 24%, var(--ryx-surface-strong));
-    font-weight: 700;
+    width: 100%;
+    color: #081311;
+    border-color: color-mix(in srgb, var(--ryx-accent) 60%, transparent);
+    background: linear-gradient(180deg, #89eadb, var(--ryx-accent));
+    font-weight: 750;
+}
+
+.ryx-main-btn:hover {
+    color: #06100e;
+    background: linear-gradient(180deg, #9ff4e7, #78dece);
 }
 
 .ryx-main-btn.is-working {
-    opacity: 0.75;
+    opacity: 0.72;
     pointer-events: none;
 }
 
-.ryx-copy-row select {
-    min-width: 0;
-    flex: 1;
+.ryx-soft-btn {
+    color: var(--ryx-text);
+    border-color: var(--ryx-border);
+    background: var(--ryx-panel);
 }
 
-.ryx-switch-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.ryx-switch-line,
-.ryx-check-line {
+.ryx-switch-line {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 34px;
-    padding: 6px 8px;
+    gap: 9px;
+    min-height: 36px;
+    padding: 7px 9px;
     border: 1px solid var(--ryx-border);
     border-radius: 8px;
-    background: var(--ryx-surface);
+    background: var(--ryx-panel);
     cursor: pointer;
 }
 
@@ -310,11 +362,11 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
 
 .ryx-switch-track {
     position: relative;
-    width: 34px;
-    height: 18px;
+    width: 36px;
+    height: 20px;
     flex: 0 0 auto;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.13);
+    background: rgba(255, 255, 255, 0.12);
     box-shadow: inset 0 0 0 1px var(--ryx-border);
 }
 
@@ -323,41 +375,20 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
     position: absolute;
     top: 3px;
     left: 3px;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--ryx-muted);
-    transition: transform 0.16s ease, background 0.16s ease;
+    transition: transform 160ms ease, background 160ms ease;
 }
 
 .ryx-switch-line input:checked + .ryx-switch-track {
-    background: var(--ryx-accent-soft);
+    background: color-mix(in srgb, var(--ryx-accent) 22%, transparent);
 }
 
 .ryx-switch-line input:checked + .ryx-switch-track::after {
     transform: translateX(16px);
     background: var(--ryx-accent);
-}
-
-.ryx-tools {
-    border-top: 1px solid var(--ryx-border);
-    padding-top: 8px;
-}
-
-.ryx-tools summary {
-    color: var(--ryx-muted);
-    cursor: pointer;
-    font-size: 12px;
-    list-style: none;
-}
-
-.ryx-tools summary::-webkit-details-marker,
-.ryx-tools summary::marker {
-    display: none;
-}
-
-.ryx-check-line {
-    margin-top: 8px;
 }
 
 .ryx-version {
@@ -388,65 +419,32 @@ li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
     border: 1px solid var(--ryx-border);
     border-radius: 8px;
     color: var(--ryx-text);
-    background: color-mix(in srgb, var(--ryx-bg) 86%, transparent);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
+    background: color-mix(in srgb, var(--ryx-bg) 88%, transparent);
+    box-shadow: var(--ryx-shadow);
     backdrop-filter: blur(10px);
     pointer-events: auto;
 }
 
 #ryx-folder-float-count {
-    min-width: 58px;
+    min-width: 68px;
     color: var(--ryx-accent);
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 750;
 }
 
 #ryx-folder-float-apply {
-    color: #17130d;
+    color: #081311;
     background: var(--ryx-accent);
 }
 
 #ryx-folder-float-cancel {
     color: #fff;
-    background: color-mix(in srgb, var(--ryx-danger) 76%, transparent);
-}
-
-.ryx-openai-fold {
-    border: 1px solid var(--ryx-border);
-    border-radius: 8px;
-    background: var(--ryx-surface);
-}
-
-.ryx-openai-fold > summary {
-    padding: 7px 10px;
-    color: var(--ryx-accent);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 700;
-    list-style: none;
-    text-align: center;
-}
-
-.ryx-openai-fold > summary::-webkit-details-marker,
-.ryx-openai-fold > summary::marker {
-    display: none;
-}
-
-@keyframes ryxSlideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    background: color-mix(in srgb, var(--ryx-warn) 76%, transparent);
 }
 
 @media (max-width: 720px) {
     .ryx-status-grid,
-    .ryx-switch-list {
+    .ryx-action-row {
         grid-template-columns: 1fr;
     }
 }
