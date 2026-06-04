@@ -10,7 +10,7 @@ import {
     state,
     EXTENSION_KEY,
 } from './state.js';
-import { buildFolderGroups, toggleAllFolders } from './folders.js';
+import { buildFolderGroups, setupFolderDrag, toggleAllFolders } from './folders.js';
 import {
     cancelFolderSelection,
     createSettingsPanel,
@@ -19,11 +19,6 @@ import {
 } from './settings-ui.js';
 
 let promptManagerHooked = false;
-let rebuildTimer = null;
-const observerOptions = {
-    childList: true,
-    subtree: true,
-};
 
 function createIconButton(icon, title, onClick, className = '') {
     const button = document.createElement('button');
@@ -33,21 +28,6 @@ function createIconButton(icon, title, onClick, className = '') {
     button.innerHTML = `<i class="fa-solid ${icon}"></i>`;
     button.addEventListener('click', onClick);
     return button;
-}
-
-function scheduleRebuild(listContainer, delay = 80) {
-    if (state.isProcessing || state.isSelecting || state.isDragging) return;
-
-    clearTimeout(rebuildTimer);
-    rebuildTimer = setTimeout(() => {
-        requestAnimationFrame(() => {
-            const observer = state.observers.get(listContainer);
-            observer?.disconnect();
-            buildFolderGroups(listContainer);
-            updateSettingsUI();
-            observer?.observe(listContainer, observerOptions);
-        });
-    }, delay);
 }
 
 function syncEnabledButton(button) {
@@ -97,59 +77,6 @@ function createToolbar(listContainer) {
 
     toolbar.append(organizeButton, expandButton, collapseButton, enabledButton, settingsButton);
     header.appendChild(toolbar);
-}
-
-function observePromptList(listContainer) {
-    state.observers.get(listContainer)?.disconnect();
-
-    const observer = new MutationObserver(mutations => {
-        if (state.isProcessing || state.isSelecting || state.isDragging) return;
-
-        const isPromptNode = node => {
-            return node.nodeType === Node.ELEMENT_NODE
-                && (node.matches(config.selectors.promptListItem) || node.querySelector(config.selectors.promptListItem));
-        };
-
-        const shouldRebuild = mutations.some(mutation => {
-            if (mutation.type === 'childList') {
-                return [...mutation.addedNodes].some(isPromptNode) || [...mutation.removedNodes].some(isPromptNode);
-            }
-
-            return false;
-        });
-
-        if (shouldRebuild) {
-            scheduleRebuild(listContainer, 100);
-        }
-    });
-
-    observer.observe(listContainer, observerOptions);
-
-    state.observers.set(listContainer, observer);
-}
-
-function setupDragRefresh(listContainer) {
-    if (listContainer.dataset.ryxDragRefresh === '1') return;
-    listContainer.dataset.ryxDragRefresh = '1';
-
-    listContainer.addEventListener('dragstart', event => {
-        if (event.target.closest(config.selectors.promptListItem)) {
-            state.isDragging = true;
-            listContainer.classList.add('ryx-is-dragging');
-            clearTimeout(rebuildTimer);
-        }
-    });
-
-    listContainer.addEventListener('dragend', () => {
-        setTimeout(() => {
-            state.isDragging = false;
-            listContainer.classList.remove('ryx-is-dragging');
-            if (!state.isSelecting) {
-                buildFolderGroups(listContainer);
-                updateSettingsUI();
-            }
-        }, 120);
-    });
 }
 
 function updateFolderHeaderStatus(promptManager) {
@@ -220,8 +147,7 @@ async function initialize(listContainer) {
     await createSettingsPanel(promptManagerContainer, listContainer);
     createToolbar(listContainer);
     buildFolderGroups(listContainer);
-    observePromptList(listContainer);
-    setupDragRefresh(listContainer);
+    setupFolderDrag(listContainer);
     installPromptManagerHook();
     updateSettingsUI();
 
