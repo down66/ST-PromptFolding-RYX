@@ -41,6 +41,13 @@ function cleanPromptItem(item) {
     item.classList.remove(config.classNames.folderHeader, config.classNames.controlledByFolder);
     item.querySelector('.ryx-folder-picker')?.remove();
 
+    const tokenCounter = item.querySelector('.prompt_manager_prompt_tokens');
+    if (tokenCounter?.dataset.ryxOriginalTokens !== undefined) {
+        tokenCounter.textContent = tokenCounter.dataset.ryxOriginalTokens;
+        delete tokenCounter.dataset.ryxOriginalTokens;
+        delete tokenCounter.dataset.ryxFolderActiveCount;
+    }
+
     const link = item.querySelector(config.selectors.promptLink);
     if (link?.dataset.ryxFolderClick === '1') {
         link.onclick = null;
@@ -118,6 +125,24 @@ function createChevron() {
     return button;
 }
 
+function isPromptEnabled(item) {
+    return !item.classList.contains('completion_prompt_manager_prompt_disabled');
+}
+
+function setFolderCounter(headerItem, childItems) {
+    const enabledCount = childItems.filter(isPromptEnabled).length;
+    const tokenCounter = headerItem.querySelector('.prompt_manager_prompt_tokens');
+
+    if (!tokenCounter) return;
+    if (tokenCounter.dataset.ryxOriginalTokens === undefined) {
+        tokenCounter.dataset.ryxOriginalTokens = tokenCounter.textContent;
+    }
+
+    tokenCounter.dataset.ryxFolderActiveCount = '1';
+    tokenCounter.textContent = String(enabledCount);
+    tokenCounter.title = `启用条目 ${enabledCount}/${childItems.length}`;
+}
+
 function createFolderDOM(headerItem, childItems) {
     const folderId = getPromptId(headerItem);
     const folderName = extractPromptName(headerItem);
@@ -135,11 +160,7 @@ function createFolderDOM(headerItem, childItems) {
 
     const summary = document.createElement('summary');
     summary.className = 'ryx-folder-summary';
-
-    const badge = document.createElement('span');
-    badge.className = 'ryx-folder-count';
-    badge.textContent = String(childItems.length);
-    badge.title = `${childItems.length} 个条目`;
+    setFolderCounter(headerItem, childItems);
 
     const chevron = createChevron();
     const toggle = event => {
@@ -159,7 +180,6 @@ function createFolderDOM(headerItem, childItems) {
         }
     });
     chevron.addEventListener('click', toggle);
-    badge.addEventListener('click', toggle);
 
     const link = headerItem.querySelector(config.selectors.promptLink);
     if (link) {
@@ -176,7 +196,7 @@ function createFolderDOM(headerItem, childItems) {
         nameSpan.onclick = toggle;
     }
 
-    summary.append(chevron, headerItem, badge);
+    summary.append(chevron, headerItem);
     details.appendChild(summary);
 
     const content = document.createElement('div');
