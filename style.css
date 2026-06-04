@@ -102,6 +102,7 @@
     border-radius: 8px;
     background: color-mix(in srgb, var(--ryx-panel-strong) 94%, transparent);
     box-shadow: none;
+    cursor: grab;
     list-style: none;
     user-select: none;
 }
@@ -115,6 +116,47 @@
     border-color: color-mix(in srgb, var(--ryx-accent) 30%, var(--ryx-border));
     background: color-mix(in srgb, var(--ryx-panel-strong) 98%, transparent);
     box-shadow: none;
+}
+
+body.ryx-folder-drag-active .ryx-folder-summary {
+    cursor: grabbing;
+}
+
+.ryx-prompt-folder.ryx-folder-dragging {
+    opacity: 0.72;
+    transform: scale(0.996);
+}
+
+.ryx-prompt-folder.ryx-folder-drop-before,
+.ryx-prompt-folder.ryx-folder-drop-after,
+li.completion_prompt_manager_prompt.ryx-folder-drop-before,
+li.completion_prompt_manager_prompt.ryx-folder-drop-after {
+    position: relative;
+}
+
+.ryx-prompt-folder.ryx-folder-drop-before::before,
+li.completion_prompt_manager_prompt.ryx-folder-drop-before::before,
+.ryx-prompt-folder.ryx-folder-drop-after::after,
+li.completion_prompt_manager_prompt.ryx-folder-drop-after::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    right: 7px;
+    z-index: 4;
+    height: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ryx-accent) 72%, var(--ryx-text));
+    pointer-events: none;
+}
+
+.ryx-prompt-folder.ryx-folder-drop-before::before,
+li.completion_prompt_manager_prompt.ryx-folder-drop-before::before {
+    top: -3px;
+}
+
+.ryx-prompt-folder.ryx-folder-drop-after::after,
+li.completion_prompt_manager_prompt.ryx-folder-drop-after::after {
+    bottom: -3px;
 }
 
 .ryx-folder-summary::before {
@@ -173,7 +215,7 @@
 }
 
 .ryx-folder-header .prompt_manager_prompt_tokens[data-ryx-folder-active-count='1'] {
-    min-width: 24px;
+    min-width: 38px;
     color: color-mix(in srgb, var(--ryx-accent) 78%, var(--ryx-text)) !important;
     font-weight: 650;
     text-align: center;
@@ -190,11 +232,6 @@
 .ryx-controlled-by-disabled-folder > span:not(.prompt_manager_prompt_tokens) {
     filter: grayscale(85%);
     opacity: 0.55;
-}
-
-#completion_prompt_manager_list.ryx-is-dragging .ryx-prompt-folder-content,
-#completion_prompt_manager_list.ryx-is-dragging .ryx-folder-summary {
-    transition: none !important;
 }
 
 li.completion_prompt_manager_prompt:has(.ryx-folder-picker) {
