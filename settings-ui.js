@@ -199,19 +199,26 @@ export function cancelFolderSelection() {
 
 async function handleReset() {
     const confirmed = await callGenericPopup(
-        '<div>确定重置当前预设的文件夹设置吗？</div>',
+        '<div>确定清空当前预设的全部文件夹吗？所有条目会恢复为普通列表。</div>',
         POPUP_TYPE.CONFIRM,
         '',
-        { okButton: '重置', cancelButton: '取消' },
+        { okButton: '清空文件夹', cancelButton: '取消' },
     );
 
     if (!confirmed) return;
 
+    state.isSelecting = false;
+    selectionSnapshot = null;
+    document.querySelectorAll('.ryx-folder-picker').forEach(checkbox => checkbox.remove());
+    document.getElementById('ryx-folder-float-wrapper')?.remove();
+
     loadFromPreset(null);
-    refreshList();
+    if (listContainerRef) {
+        flattenPromptList(listContainerRef);
+    }
     updateSettingsUI();
     await saveToPreset();
-    toastr.info('已重置文件夹设置');
+    toastr.info('已清空文件夹，恢复为普通条目列表');
 }
 
 function loadManifestInfo() {
