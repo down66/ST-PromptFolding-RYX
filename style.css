@@ -11,11 +11,11 @@
     --ryx-muted: color-mix(in srgb, var(--SmartThemeBodyColor, #f1f3f5) 58%, transparent);
     --ryx-border: color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 30%, transparent);
     --ryx-hairline: color-mix(in srgb, var(--SmartThemeBorderColor, #ffffff) 18%, transparent);
-    --ryx-accent: #8aa4ff;
-    --ryx-accent-soft: rgba(138, 164, 255, 0.14);
+    --ryx-accent: #7f99d6;
+    --ryx-accent-soft: rgba(127, 153, 214, 0.12);
     --ryx-warn: #ef8585;
-    --ryx-shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.18);
-    --ryx-shadow-tiny: 0 2px 8px rgba(0, 0, 0, 0.16);
+    --ryx-shadow-soft: 0 5px 16px rgba(0, 0, 0, 0.14);
+    --ryx-shadow-tiny: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 .completion_prompt_manager_header {
@@ -88,7 +88,7 @@
 
 .ryx-prompt-folder {
     list-style: none !important;
-    margin: 6px 0 8px;
+    margin: 3px 0 4px;
     border-radius: 8px;
 }
 
@@ -96,14 +96,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    min-height: 38px;
-    padding: 3px 8px 3px 4px;
-    border: 1px solid color-mix(in srgb, var(--ryx-border) 86%, transparent);
+    min-height: 34px;
+    padding: 2px 6px 2px 4px;
+    border: 1px solid color-mix(in srgb, var(--ryx-border) 78%, transparent);
     border-radius: 8px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
         color-mix(in srgb, var(--ryx-panel-strong) 94%, transparent);
-    box-shadow: var(--ryx-shadow-tiny), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
     list-style: none;
     user-select: none;
 }
@@ -118,13 +118,13 @@
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
         color-mix(in srgb, var(--ryx-panel-strong) 98%, transparent);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
 .ryx-folder-summary::before {
     content: '';
-    width: 3px;
-    height: 18px;
+    width: 2px;
+    height: 17px;
     flex: 0 0 auto;
     border-radius: 999px;
     background: color-mix(in srgb, var(--ryx-accent) 52%, var(--ryx-border));
@@ -134,7 +134,7 @@
 .ryx-folder-chevron {
     width: 24px;
     min-width: 24px;
-    min-height: 28px;
+    min-height: 26px;
     border: none;
     color: color-mix(in srgb, var(--ryx-accent) 84%, var(--ryx-muted));
 }
@@ -150,7 +150,7 @@
 .ryx-folder-summary > li.completion_prompt_manager_prompt {
     flex: 1;
     min-width: 0;
-    min-height: 30px;
+    min-height: 28px;
     margin: 0 !important;
     border: 0 !important;
     background: transparent !important;
@@ -170,25 +170,17 @@
     padding: 0 !important;
 }
 
-.ryx-folder-count {
-    flex: 0 0 auto;
-    min-width: 28px;
-    height: 20px;
-    padding: 0 8px;
-    border: 1px solid color-mix(in srgb, var(--ryx-accent) 26%, transparent);
-    border-radius: 999px;
-    color: color-mix(in srgb, var(--ryx-accent) 82%, var(--ryx-text));
-    background: color-mix(in srgb, var(--ryx-accent) 9%, rgba(255, 255, 255, 0.04));
-    font-size: 11px;
-    line-height: 19px;
-    text-align: center;
-    white-space: nowrap;
+.ryx-prompt-folder-content {
+    margin: 3px 0 1px 8px;
+    padding: 2px 0 2px 8px;
+    border-left: 1px solid color-mix(in srgb, var(--ryx-accent) 18%, var(--ryx-border));
 }
 
-.ryx-prompt-folder-content {
-    margin: 5px 0 2px 9px;
-    padding: 3px 0 3px 9px;
-    border-left: 1px solid color-mix(in srgb, var(--ryx-accent) 22%, var(--ryx-border));
+.ryx-folder-header .prompt_manager_prompt_tokens[data-ryx-folder-active-count='1'] {
+    min-width: 24px;
+    color: color-mix(in srgb, var(--ryx-accent) 78%, var(--ryx-text)) !important;
+    font-weight: 650;
+    text-align: center;
 }
 
 .ryx-prompt-folder-content:empty::after {
