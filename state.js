@@ -1,5 +1,6 @@
 export const EXTENSION_KEY = 'riyuexi_prompt_folders';
 export const LEGACY_EXTENSION_KEY = 'prompt_folding';
+const STORAGE_KEY = 'ryx-prompt-folders-by-preset';
 
 export const config = {
     selectors: {
@@ -22,10 +23,10 @@ export const state = {
     enabled: true,
     folderIds: new Set(),
     openStates: {},
-    debug: false,
 
     isProcessing: false,
     isSelecting: false,
+    isDragging: false,
     observers: new WeakMap(),
     folderChildren: {},
     folderHeaderStatus: {},
@@ -34,11 +35,7 @@ export const state = {
 
 let cachedSavePreset = null;
 
-export function log(...args) {
-    if (state.debug) {
-        console.log('[RiyuexiPromptFolders]', ...args);
-    }
-}
+export function log() {}
 
 export function setCachedSavePreset(fn) {
     cachedSavePreset = typeof fn === 'function' ? fn : null;
@@ -86,8 +83,33 @@ export function normalizeFolderData(data) {
         enabled: data.enabled ?? data.featureEnabled ?? true,
         openStates: data.openStates ?? {},
         folderIds: normalizeHeaderIds(data.folderIds ?? data.manualHeaders ?? []),
-        debug: data.debug ?? data.debugMode ?? false,
     };
+}
+
+function readLocalStore() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function writeLocalStore(store) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+        console.warn('[RiyuexiPromptFolders] local backup save failed:', error);
+    }
+}
+
+function getLocalData(presetName = getCurrentPresetName()) {
+    return normalizeFolderData(readLocalStore()[presetName]);
+}
+
+function saveLocalData(presetName, data) {
+    const store = readLocalStore();
+    store[presetName] = data;
+    writeLocalStore(store);
 }
 
 export function loadFromPreset(data) {
@@ -96,26 +118,28 @@ export function loadFromPreset(data) {
     state.enabled = normalized?.enabled ?? true;
     state.openStates = normalized?.openStates ?? {};
     state.folderIds = new Set(normalized?.folderIds ?? []);
-    state.debug = normalized?.debug ?? false;
 
     state.folderChildren = {};
     state.folderHeaderStatus = {};
     state.originalNames = new Map();
 
-    log('Loaded preset data', getStateForSave());
+    log('Loaded folder data', getStateForSave());
 }
 
 export function getStateForSave() {
     return {
-        version: 1,
+        version: 2,
         enabled: state.enabled,
         openStates: state.openStates,
         folderIds: [...state.folderIds],
-        debug: state.debug,
     };
 }
 
 export async function saveToPreset() {
+    const folderData = getStateForSave();
+    const presetName = getCurrentPresetName();
+    saveLocalData(presetName, folderData);
+
     try {
         const [
             { oai_settings, openai_settings, openai_setting_names },
@@ -125,25 +149,25 @@ export async function saveToPreset() {
             import('../../../../script.js'),
         ]);
 
-        const folderData = getStateForSave();
+        const activePresetName = oai_settings.preset_settings_openai || presetName;
         oai_settings.extensions ??= {};
         oai_settings.extensions[EXTENSION_KEY] = folderData;
 
-        const presetName = oai_settings.preset_settings_openai || getCurrentPresetName();
-        const presetIndex = openai_setting_names[presetName];
-
+        const presetIndex = openai_setting_names[activePresetName];
         if (presetIndex !== undefined) {
             openai_settings[presetIndex].extensions ??= {};
             openai_settings[presetIndex].extensions[EXTENSION_KEY] = folderData;
         }
 
+        saveLocalData(activePresetName, folderData);
+
         if (cachedSavePreset) {
-            await cachedSavePreset(presetName, oai_settings, false);
+            await cachedSavePreset(activePresetName, oai_settings, false);
             return;
         }
 
         if (presetIndex === undefined) {
-            console.error('[RiyuexiPromptFolders] Preset not found:', presetName);
+            console.warn('[RiyuexiPromptFolders] Preset not found, saved local backup only:', activePresetName);
             return;
         }
 
@@ -152,73 +176,35 @@ export async function saveToPreset() {
             headers: getRequestHeaders(),
             body: JSON.stringify({
                 apiId: 'openai',
-                name: presetName,
+                name: activePresetName,
                 preset: openai_settings[presetIndex],
             }),
         });
 
         if (!response.ok) {
-            console.error('[RiyuexiPromptFolders] Save failed:', response.status, response.statusText);
+            console.warn('[RiyuexiPromptFolders] Preset save failed, local backup is kept:', response.status, response.statusText);
         }
     } catch (error) {
-        console.error('[RiyuexiPromptFolders] saveToPreset failed:', error);
+        console.warn('[RiyuexiPromptFolders] Preset save failed, local backup is kept:', error);
     }
 }
 
 export function saveToPresetSoon() {
-    saveToPreset().catch(error => console.error('[RiyuexiPromptFolders] Save failed:', error));
+    saveToPreset().catch(error => console.warn('[RiyuexiPromptFolders] Save failed:', error));
 }
 
 export async function getCurrentPresetFolderData() {
+    const fallbackName = getCurrentPresetName();
+
     try {
         const { oai_settings, openai_settings, openai_setting_names } = await import('../../../../scripts/openai.js');
-        const presetName = oai_settings.preset_settings_openai || getCurrentPresetName();
+        const presetName = oai_settings.preset_settings_openai || fallbackName;
         const presetIndex = openai_setting_names[presetName];
-        if (presetIndex === undefined) return null;
-
-        const extensions = openai_settings[presetIndex]?.extensions;
-        return extensions?.[EXTENSION_KEY] ?? extensions?.[LEGACY_EXTENSION_KEY] ?? null;
+        const extensions = presetIndex === undefined ? null : openai_settings[presetIndex]?.extensions;
+        const presetData = normalizeFolderData(extensions?.[EXTENSION_KEY] ?? extensions?.[LEGACY_EXTENSION_KEY]);
+        return presetData ?? getLocalData(presetName) ?? null;
     } catch (error) {
-        console.error('[RiyuexiPromptFolders] getCurrentPresetFolderData failed:', error);
-        return null;
+        console.warn('[RiyuexiPromptFolders] getCurrentPresetFolderData fell back to local backup:', error);
+        return getLocalData(fallbackName) ?? null;
     }
-}
-
-export function getAllPresetNames() {
-    return Array.from(document.querySelectorAll('#settings_preset_openai option'))
-        .map(option => option.textContent.trim())
-        .filter(Boolean);
-}
-
-export async function exportConfigFromPreset(presetName) {
-    if (presetName === getCurrentPresetName()) {
-        return getStateForSave();
-    }
-
-    try {
-        const { openai_settings, openai_setting_names } = await import('../../../../scripts/openai.js');
-        const presetIndex = openai_setting_names[presetName];
-        const extensions = openai_settings?.[presetIndex]?.extensions;
-        return normalizeFolderData(extensions?.[EXTENSION_KEY] ?? extensions?.[LEGACY_EXTENSION_KEY]);
-    } catch (error) {
-        console.error('[RiyuexiPromptFolders] exportConfigFromPreset failed:', error);
-        return null;
-    }
-}
-
-export async function importConfigToCurrentPreset(configData, currentPromptItems) {
-    const normalized = normalizeFolderData(configData);
-    loadFromPreset(normalized);
-
-    const currentIds = new Set(currentPromptItems.map(getPromptId).filter(Boolean));
-    const matchedFolderIds = [...state.folderIds].filter(id => currentIds.has(id));
-    const missedFolderIds = [...state.folderIds].filter(id => !currentIds.has(id));
-
-    state.folderIds = new Set(matchedFolderIds);
-    await saveToPreset();
-
-    return {
-        matched: matchedFolderIds.length,
-        missed: missedFolderIds.length,
-    };
 }
