@@ -7,6 +7,6 @@
   "css": ["style.css"],
   "type": "module",
   "author": "Codex + 日月西 style",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "homePage": "https://github.com/SillyTavern/SillyTavern"
 }
