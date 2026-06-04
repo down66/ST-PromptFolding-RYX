@@ -13,7 +13,7 @@ let saveTimer = null;
 
 function debounceSave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveToPresetSoon(), 600);
+    saveTimer = setTimeout(() => saveToPresetSoon(), 450);
 }
 
 export function getPromptItems(listContainer) {
@@ -56,17 +56,65 @@ function cleanPromptItem(item) {
     rememberPromptName(item);
 }
 
-function createChevron(details) {
+function setFolderOpen(details, shouldOpen, animate = true) {
+    if (!details || details.dataset.ryxAnimating === '1') return;
+
+    const folderId = details.dataset.folderId;
+    const content = details.querySelector(`.${config.classNames.folderContent}`);
+    state.openStates[folderId] = shouldOpen;
+    debounceSave();
+
+    if (!content || !animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        details.open = shouldOpen;
+        return;
+    }
+
+    details.dataset.ryxAnimating = '1';
+    content.style.overflow = 'hidden';
+    content.style.transition = 'max-height 180ms ease, opacity 160ms ease, transform 180ms ease';
+
+    if (shouldOpen) {
+        details.open = true;
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-3px)';
+
+        requestAnimationFrame(() => {
+            content.style.maxHeight = `${content.scrollHeight}px`;
+            content.style.opacity = '1';
+            content.style.transform = 'translateY(0)';
+        });
+    } else {
+        content.style.maxHeight = `${content.scrollHeight}px`;
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0)';
+
+        requestAnimationFrame(() => {
+            content.style.maxHeight = '0px';
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(-3px)';
+        });
+    }
+
+    window.setTimeout(() => {
+        if (!shouldOpen) {
+            details.open = false;
+        }
+        content.style.overflow = '';
+        content.style.transition = '';
+        content.style.maxHeight = '';
+        content.style.opacity = '';
+        content.style.transform = '';
+        delete details.dataset.ryxAnimating;
+    }, 210);
+}
+
+function createChevron() {
     const button = document.createElement('button');
     button.className = 'ryx-folder-chevron';
     button.type = 'button';
     button.title = '展开/收起';
     button.innerHTML = '<i class="fa-solid fa-angle-right"></i>';
-    button.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        details.open = !details.open;
-    });
     return button;
 }
 
@@ -87,14 +135,30 @@ function createFolderDOM(headerItem, childItems) {
 
     const summary = document.createElement('summary');
     summary.className = 'ryx-folder-summary';
-    summary.dataset.count = String(childItems.length);
+
+    const badge = document.createElement('span');
+    badge.className = 'ryx-folder-count';
+    badge.textContent = `${childItems.length} 项`;
+
+    const chevron = createChevron();
+    const toggle = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setFolderOpen(details, !details.open, true);
+    };
 
     summary.addEventListener('click', event => {
         if (event.target === summary) {
-            event.preventDefault();
-            details.open = !details.open;
+            toggle(event);
         }
     });
+    summary.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            toggle(event);
+        }
+    });
+    chevron.addEventListener('click', toggle);
+    badge.addEventListener('click', toggle);
 
     const link = headerItem.querySelector(config.selectors.promptLink);
     if (link) {
@@ -108,25 +172,16 @@ function createFolderDOM(headerItem, childItems) {
     const nameSpan = headerItem.querySelector(config.selectors.promptNameSpan);
     if (nameSpan) {
         nameSpan.dataset.ryxFolderClick = '1';
-        nameSpan.onclick = event => {
-            event.preventDefault();
-            event.stopPropagation();
-            details.open = !details.open;
-        };
+        nameSpan.onclick = toggle;
     }
 
-    summary.append(createChevron(details), headerItem);
+    summary.append(chevron, headerItem, badge);
     details.appendChild(summary);
 
     const content = document.createElement('div');
     content.className = config.classNames.folderContent;
     childItems.forEach(item => content.appendChild(item));
     details.appendChild(content);
-
-    details.addEventListener('toggle', () => {
-        state.openStates[folderId] = details.open;
-        debounceSave();
-    });
 
     return details;
 }
@@ -166,7 +221,7 @@ export function buildFolderGroups(listContainer) {
         state.folderChildren = {};
         state.folderHeaderStatus = {};
 
-        if (!state.enabled || state.isSelecting || state.folderIds.size === 0) {
+        if (!state.enabled || state.folderIds.size === 0) {
             allItems.forEach(item => listContainer.appendChild(item));
             return;
         }
@@ -213,7 +268,7 @@ export function toggleAllFolders(listContainer, shouldOpen) {
             state.openStates[folder.dataset.folderId] = shouldOpen;
         }
     });
-    saveToPreset().catch(error => console.error('[RiyuexiPromptFolders] Save failed:', error));
+    saveToPreset().catch(error => console.warn('[RiyuexiPromptFolders] Save failed:', error));
 }
 
 export function applyDisabledFolderStyles(listContainer) {
