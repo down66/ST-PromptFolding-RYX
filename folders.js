@@ -138,7 +138,8 @@ function createFolderDOM(headerItem, childItems) {
 
     const badge = document.createElement('span');
     badge.className = 'ryx-folder-count';
-    badge.textContent = `${childItems.length} 项`;
+    badge.textContent = String(childItems.length);
+    badge.title = `${childItems.length} 个条目`;
 
     const chevron = createChevron();
     const toggle = event => {
