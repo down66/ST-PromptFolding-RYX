@@ -12,7 +12,6 @@ import {
 } from './state.js';
 import { buildFolderGroups, toggleAllFolders } from './folders.js';
 import {
-    applyFoldSettings,
     cancelFolderSelection,
     createSettingsPanel,
     startFolderSelection,
@@ -20,6 +19,12 @@ import {
 } from './settings-ui.js';
 
 let promptManagerHooked = false;
+let rebuildTimer = null;
+const observerOptions = {
+    childList: true,
+    subtree: true,
+    characterData: true,
+};
 
 function createIconButton(icon, title, onClick, className = '') {
     const button = document.createElement('button');
@@ -29,6 +34,27 @@ function createIconButton(icon, title, onClick, className = '') {
     button.innerHTML = `<i class="fa-solid ${icon}"></i>`;
     button.addEventListener('click', onClick);
     return button;
+}
+
+function scheduleRebuild(listContainer, delay = 80) {
+    if (state.isProcessing || state.isSelecting || state.isDragging) return;
+
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+            const observer = state.observers.get(listContainer);
+            observer?.disconnect();
+            buildFolderGroups(listContainer);
+            updateSettingsUI();
+            observer?.observe(listContainer, observerOptions);
+        });
+    }, delay);
+}
+
+function syncEnabledButton(button) {
+    button.classList.toggle('is-off', !state.enabled);
+    button.innerHTML = `<i class="fa-solid ${state.enabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>`;
+    button.title = state.enabled ? '点击停用文件夹' : '点击启用文件夹';
 }
 
 function createToolbar(listContainer) {
@@ -54,18 +80,14 @@ function createToolbar(listContainer) {
 
     const enabledButton = createIconButton('fa-toggle-on', '启用/停用文件夹', () => {
         state.enabled = !state.enabled;
-        enabledButton.classList.toggle('is-off', !state.enabled);
-        enabledButton.innerHTML = `<i class="fa-solid ${state.enabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>`;
-        enabledButton.title = state.enabled ? '点击停用文件夹' : '点击启用文件夹';
+        syncEnabledButton(enabledButton);
         buildFolderGroups(listContainer);
         updateSettingsUI();
         saveToPresetSoon();
     }, 'ryx-enabled');
+    syncEnabledButton(enabledButton);
 
-    enabledButton.classList.toggle('is-off', !state.enabled);
-    enabledButton.innerHTML = `<i class="fa-solid ${state.enabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>`;
-
-    const settingsButton = createIconButton('fa-wand-magic-sparkles', '文件夹面板', () => {
+    const settingsButton = createIconButton('fa-sliders', '文件夹面板', () => {
         const panel = document.getElementById('ryx-folder-settings');
         if (!panel) return;
         const shouldShow = panel.style.display === 'none' || !panel.style.display;
@@ -82,7 +104,7 @@ function observePromptList(listContainer) {
     state.observers.get(listContainer)?.disconnect();
 
     const observer = new MutationObserver(mutations => {
-        if (state.isProcessing || state.isSelecting) return;
+        if (state.isProcessing || state.isSelecting || state.isDragging) return;
 
         const isPromptNode = node => {
             return node.nodeType === Node.ELEMENT_NODE
@@ -98,35 +120,15 @@ function observePromptList(listContainer) {
                 return !!mutation.target.parentElement?.closest?.(config.selectors.promptListItem);
             }
 
-            if (mutation.type === 'attributes') {
-                return mutation.target.matches?.(config.selectors.promptListItem);
-            }
-
             return false;
         });
 
-        if (!shouldRebuild) return;
-
-        observer.disconnect();
-        buildFolderGroups(listContainer);
-        setTimeout(() => {
-            observer.observe(listContainer, {
-                childList: true,
-                subtree: true,
-                characterData: true,
-                attributes: true,
-                attributeFilter: ['class', 'data-pm-identifier'],
-            });
-        }, 120);
+        if (shouldRebuild) {
+            scheduleRebuild(listContainer, 100);
+        }
     });
 
-    observer.observe(listContainer, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ['class', 'data-pm-identifier'],
-    });
+    observer.observe(listContainer, observerOptions);
 
     state.observers.set(listContainer, observer);
 }
@@ -137,24 +139,21 @@ function setupDragRefresh(listContainer) {
 
     listContainer.addEventListener('dragstart', event => {
         if (event.target.closest(config.selectors.promptListItem)) {
-            state.observers.get(listContainer)?.disconnect();
+            state.isDragging = true;
+            listContainer.classList.add('ryx-is-dragging');
+            clearTimeout(rebuildTimer);
         }
     });
 
     listContainer.addEventListener('dragend', () => {
         setTimeout(() => {
+            state.isDragging = false;
+            listContainer.classList.remove('ryx-is-dragging');
             if (!state.isSelecting) {
                 buildFolderGroups(listContainer);
+                updateSettingsUI();
             }
-            state.observers.get(listContainer)?.observe(listContainer, {
-                childList: true,
-                subtree: true,
-                characterData: true,
-                attributes: true,
-                attributeFilter: ['class', 'data-pm-identifier'],
-            });
-            updateSettingsUI();
-        }, 160);
+        }, 120);
     });
 }
 
@@ -224,10 +223,6 @@ async function initialize(listContainer) {
     cancelFolderSelection();
 
     await createSettingsPanel(promptManagerContainer, listContainer);
-    if (localStorage.getItem('ryx-fold-openai-settings') === '1') {
-        applyFoldSettings(true);
-    }
-
     createToolbar(listContainer);
     buildFolderGroups(listContainer);
     observePromptList(listContainer);
@@ -263,21 +258,20 @@ if (initialList) {
     initialize(initialList);
 }
 
-eventSource.on(event_types.OAI_PRESET_CHANGED_BEFORE, ({ preset, savePreset }) => {
+eventSource.on(event_types.OAI_PRESET_CHANGED_BEFORE, ({ savePreset }) => {
     setCachedSavePreset(savePreset);
     cancelFolderSelection();
-    loadFromPreset(preset.extensions?.[EXTENSION_KEY] ?? preset.extensions?.prompt_folding);
-    log('Loaded data before preset change');
 });
 
-eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, () => {
+eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, async () => {
+    const folderData = await getCurrentPresetFolderData();
+    loadFromPreset(folderData);
+
     const listContainer = document.querySelector(config.selectors.promptList);
     if (!listContainer) return;
+    createToolbar(listContainer);
     buildFolderGroups(listContainer);
     updateSettingsUI();
-    if (localStorage.getItem('ryx-fold-openai-settings') === '1') {
-        applyFoldSettings(true);
-    }
 });
 
 eventSource.on(event_types.OAI_PRESET_EXPORT_READY, preset => {
