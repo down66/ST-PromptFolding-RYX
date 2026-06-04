@@ -1,229 +1,143 @@
-import { config, state, log, loadFromPreset, saveToPreset, setCachedSavePreset, getStateForSave, getCurrentPresetFoldingData } from './state.js';
-import { buildCollapsibleGroups, toggleAllGroups } from './prompt-folding.js';
-import { createSettingsPanel, cancelManualSelection, updateSettingsUI, applyFoldSettings } from './settings-ui.js';
-import { eventSource, event_types } from '../../../../script.js';
+/**
+ * Prompt Folding Plugin (日月西 style)
+ * Entry point — observes DOM, triggers rebuild on changes.
+ */
+import { rebuild } from './prompt-folding.js';
 
-let isHooked = false;
+const LIST_SELECTOR = '#completion_prompt_manager_list';
+const ITEM_SELECTOR = 'li.completion_prompt_manager_prompt';
 
-// --- 1. List content observer ---
-function createListContentObserver(listContainer) {
-    if (state.observers.has(listContainer)) state.observers.get(listContainer).disconnect();
+let observer = null;
+let rebuildTimer = null;
+let isProcessing = false;
 
-    const observer = new MutationObserver((mutations) => {
-        if (state.isProcessing) return;
+function debouncedRebuild() {
+    if (isProcessing) return;
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+        isProcessing = true;
+        try {
+            rebuild();
+        } catch (e) {
+            console.error('[RYX] Rebuild error:', e);
+        } finally {
+            isProcessing = false;
+        }
+    }, 200);
+}
 
-        const isPromptNode = (n) => n.nodeType === 1 && (n.matches(config.selectors.promptListItem) || n.querySelector(config.selectors.promptListItem));
+function setupObserver(listContainer) {
+    if (observer) observer.disconnect();
+
+    observer = new MutationObserver((mutations) => {
+        if (isProcessing) return;
 
         const shouldRebuild = mutations.some(m => {
-            if (m.type === 'childList' && (Array.from(m.addedNodes).some(isPromptNode) || Array.from(m.removedNodes).some(isPromptNode))) {
-                log('Detected childList change, rebuilding');
-                return true;
+            if (m.type === 'childList') {
+                const added = Array.from(m.addedNodes).some(
+                    n => n.nodeType === 1 && (
+                        n.matches?.(ITEM_SELECTOR) ||
+                        n.querySelector?.(ITEM_SELECTOR)
+                    )
+                );
+                const removed = Array.from(m.removedNodes).some(
+                    n => n.nodeType === 1 && (
+                        n.matches?.(ITEM_SELECTOR) ||
+                        n.querySelector?.(ITEM_SELECTOR)
+                    )
+                );
+                if (added || removed) return true;
             }
+            // CharacterData: prompt name changed
             if (m.type === 'characterData') {
-                const target = m.target.parentElement;
-                if (target && target.matches(config.selectors.promptLink)) {
-                    log('Prompt name changed, rebuilding');
-                    return true;
-                }
+                const parent = m.target.parentElement;
+                if (parent?.matches?.('a.prompt-manager-inspect-action')) return true;
             }
             return false;
         });
 
         if (shouldRebuild) {
-            observer.disconnect();
-            buildCollapsibleGroups(listContainer);
-            setTimeout(() => observer.observe(listContainer, { childList: true, subtree: true, characterData: true }), 100);
+            debouncedRebuild();
         }
     });
 
-    observer.observe(listContainer, { childList: true, subtree: true, characterData: true });
-    state.observers.set(listContainer, observer);
+    observer.observe(listContainer, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+    });
 }
 
-// --- 2. Drag handlers ---
+// Handle drag — pause observer during drag, rebuild after
 function setupDragHandlers(listContainer) {
-    listContainer.addEventListener('dragstart', (e) => {
-        if (e.target.closest(config.selectors.promptListItem)) {
-            state.observers.get(listContainer)?.disconnect();
-        }
+    listContainer.addEventListener('dragstart', () => {
+        observer?.disconnect();
     });
 
     listContainer.addEventListener('dragend', () => {
+        // Rebuild after drag settles
         setTimeout(() => {
-            buildCollapsibleGroups(listContainer);
-            state.observers.get(listContainer)?.observe(listContainer, { childList: true, subtree: true, characterData: true });
-        }, 150);
-    });
-}
-
-// --- 3. Toolbar button helpers ---
-function createBtn(label, title, onClick, className = '') {
-    const btn = document.createElement('button');
-    btn.className = `menu_button ${className}`.trim();
-    btn.textContent = label;
-    btn.title = title;
-    btn.onclick = onClick;
-    return btn;
-}
-
-function setupToggleButton(listContainer) {
-    const header = document.querySelector('.completion_prompt_manager_header');
-    if (!header) return;
-
-    header.querySelector('.pf-collapse-controls')?.remove();
-
-    const container = document.createElement('div');
-    container.className = 'pf-collapse-controls';
-
-    // Folder icon for expand/collapse all
-    container.append(
-        createBtn('📂', 'Expand All', () => toggleAllGroups(listContainer, true), ''),
-        createBtn('📁', 'Collapse All', () => toggleAllGroups(listContainer, false), ''),
-    );
-
-    // Toggle enable/disable
-    const toggleBtn = createBtn('', '', () => {
-        state.isEnabled = !state.isEnabled;
-        saveToPreset().catch(err => console.error('[PF] Save failed:', err));
-        updateToggleState();
-        buildCollapsibleGroups(listContainer);
-    });
-
-    const updateToggleState = () => {
-        toggleBtn.textContent = state.isEnabled ? '🟢' : '🔴';
-        toggleBtn.title = state.isEnabled ? 'Click to Disable' : 'Click to Enable';
-    };
-    updateToggleState();
-    container.append(toggleBtn);
-
-    // Settings gear button
-    const settingsBtn = createBtn('⚙', 'Group Settings', () => {
-        const panel = document.getElementById('pf-settings-panel');
-        if (panel) {
-            const isHidden = panel.style.display === 'none';
-            panel.style.display = isHidden ? 'block' : 'none';
-            settingsBtn.classList.toggle('active', isHidden);
-        }
-    }, 'pf-settings-toggle');
-    container.append(settingsBtn);
-
-    const target = header.firstElementChild?.nextSibling || header.firstChild;
-    header.insertBefore(container, target);
-}
-
-// --- 4. Hook the prompt manager ---
-function hookPromptManager(pm) {
-    const originalGet = pm.getPromptCollection.bind(pm);
-
-    pm.getPromptCollection = function(type) {
-        const collection = originalGet(type);
-        if (!state.isEnabled) return collection;
-
-        updateGroupHeaderStatus(pm);
-
-        const disabledIds = new Set();
-        for (const [groupKey, childIds] of Object.entries(state.groupHierarchy)) {
-            if (state.groupHeaderStatus[groupKey] === false) {
-                childIds.forEach(id => disabledIds.add(id));
+            debouncedRebuild();
+            if (observer && listContainer) {
+                observer.observe(listContainer, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
             }
-        }
-
-        if (disabledIds.size > 0) {
-            collection.collection = collection.collection.filter(p => !disabledIds.has(p.identifier));
-        }
-
-        return collection;
-    };
-    log('Hook installed.');
-}
-
-function updateGroupHeaderStatus(pm) {
-    const char = pm.activeCharacter;
-    if (!char) return;
-
-    const order = pm.getPromptOrderForCharacter(char);
-    Object.keys(state.groupHierarchy).forEach(headerId => {
-        const entry = order.find(e => e.identifier === headerId);
-        if (entry) state.groupHeaderStatus[headerId] = entry.enabled;
+        }, 200);
     });
 }
 
-// --- 5. Initialize ---
-async function initialize(listContainer) {
-    const pmWrapper = listContainer.closest('#completion_prompt_manager');
-    if (!pmWrapper) return;
+// --- Init ---
+function tryInit(listContainer) {
+    if (!listContainer) return;
+    if (listContainer.dataset.ryxInitialized) return;
+    listContainer.dataset.ryxInitialized = '1';
 
-    const pfData = await getCurrentPresetFoldingData();
-    loadFromPreset(pfData);
-
-    cancelManualSelection();
-    log('Initializing Prompt Folding...');
-
-    createSettingsPanel(pmWrapper, listContainer);
-    if (localStorage.getItem('pf-fold-settings') === '1') applyFoldSettings(true);
-    setupToggleButton(listContainer);
-    buildCollapsibleGroups(listContainer);
-    createListContentObserver(listContainer);
+    console.log('[RYX] Prompt Folding initializing...');
+    rebuild();
+    setupObserver(listContainer);
     setupDragHandlers(listContainer);
-
-    log('Initialization complete');
-
-    if (!isHooked) {
-        import('../../../../scripts/openai.js').then(m => {
-            const check = setInterval(() => {
-                if (m.promptManager?.serviceSettings) {
-                    clearInterval(check);
-                    hookPromptManager(m.promptManager);
-                    isHooked = true;
-                }
-            }, 100);
-            setTimeout(() => clearInterval(check), 5000);
-        });
-    }
+    console.log('[RYX] Ready. Groups will be auto-detected by divider patterns.');
 }
 
-// Observer for prompt list appearing in DOM
+// Wait for the list to appear
 const globalObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
         for (const node of m.addedNodes) {
             if (node.nodeType !== 1) continue;
-            if (node.matches(config.selectors.promptList)) return initialize(node);
-            const list = node.querySelector(config.selectors.promptList);
-            if (list) return initialize(list);
+            if (node.matches?.(LIST_SELECTOR)) {
+                tryInit(node);
+                return;
+            }
+            const list = node.querySelector?.(LIST_SELECTOR);
+            if (list) {
+                tryInit(list);
+                return;
+            }
         }
     }
 });
 globalObserver.observe(document.body, { childList: true, subtree: true });
 
-const initialList = document.querySelector(config.selectors.promptList);
-if (initialList) initialize(initialList);
+// Try immediate init
+const existingList = document.querySelector(LIST_SELECTOR);
+if (existingList) tryInit(existingList);
 
-// --- 6. Preset events ---
-eventSource.on(event_types.OAI_PRESET_CHANGED_BEFORE, ({ preset, savePreset }) => {
-    setCachedSavePreset(savePreset);
-    cancelManualSelection();
-    loadFromPreset(preset.extensions?.prompt_folding);
-    log('OAI_PRESET_CHANGED_BEFORE: loaded new preset data');
-});
-
-eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, () => {
-    const listContainer = document.querySelector(config.selectors.promptList);
-    if (listContainer) {
-        buildCollapsibleGroups(listContainer);
-        updateSettingsUI();
-        if (localStorage.getItem('pf-fold-settings') === '1') applyFoldSettings(true);
+// Listen for DOM removal (e.g., preset switch replaces the entire list)
+const removalObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+        for (const node of m.removedNodes) {
+            if (node.nodeType !== 1) continue;
+            if (node.matches?.(LIST_SELECTOR) || node.querySelector?.(LIST_SELECTOR)) {
+                // Old list removed, clear init flag so new list can be picked up
+                delete node.dataset?.ryxInitialized;
+                const inner = node.querySelector?.(LIST_SELECTOR);
+                if (inner) delete inner.dataset.ryxInitialized;
+                observer?.disconnect();
+            }
+        }
     }
 });
-
-eventSource.on(event_types.OAI_PRESET_EXPORT_READY, (preset) => {
-    preset.extensions ??= {};
-    preset.extensions.prompt_folding = getStateForSave();
-    log('Folding config injected into export');
-});
-
-eventSource.on(event_types.OAI_PRESET_IMPORT_READY, ({ data, presetName }) => {
-    const pfData = data?.extensions?.prompt_folding;
-    if (!pfData) return;
-    loadFromPreset(pfData);
-    log('OAI_PRESET_IMPORT_READY: loaded folding data for', presetName);
-});
+removalObserver.observe(document.body, { childList: true, subtree: true });
