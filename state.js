@@ -26,11 +26,8 @@ export const state = {
 
     isProcessing: false,
     isSelecting: false,
-    isDragging: false,
-    observers: new WeakMap(),
     folderChildren: {},
     folderHeaderStatus: {},
-    originalNames: new Map(),
 };
 
 let cachedSavePreset = null;
@@ -52,12 +49,6 @@ export function extractPromptName(item) {
     const textNodes = Array.from(link.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
     const text = textNodes.map(node => node.textContent).join('').trim();
     return text || link.textContent.trim();
-}
-
-export function rememberPromptName(item) {
-    const id = getPromptId(item);
-    if (!id) return;
-    state.originalNames.set(id, extractPromptName(item));
 }
 
 export function getCurrentPresetName() {
@@ -121,7 +112,6 @@ export function loadFromPreset(data) {
 
     state.folderChildren = {};
     state.folderHeaderStatus = {};
-    state.originalNames = new Map();
 
     log('Loaded folder data', getStateForSave());
 }
