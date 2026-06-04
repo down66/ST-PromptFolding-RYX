@@ -1,0 +1,14 @@
+{
+  "display_name": "Prompt Folding (riyuexi style)",
+  "loading_order": 1,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": ["collapsible-prompt.css"],
+  "settings": "settings.html",
+  "type": "module",
+  "author": "based on mingyu & riyuexi",
+  "version": "1.0.0",
+  "homePage": "https://github.com/lilminzyu/ST-PromptFolding",
+  "description": "Organize your Prompt Manager into clean, collapsible groups with riyuexi-inspired visual design. Manual selection mode, cross-preset config copy, and more."
+}
