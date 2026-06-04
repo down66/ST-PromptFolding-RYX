@@ -23,7 +23,6 @@ let rebuildTimer = null;
 const observerOptions = {
     childList: true,
     subtree: true,
-    characterData: true,
 };
 
 function createIconButton(icon, title, onClick, className = '') {
@@ -114,10 +113,6 @@ function observePromptList(listContainer) {
         const shouldRebuild = mutations.some(mutation => {
             if (mutation.type === 'childList') {
                 return [...mutation.addedNodes].some(isPromptNode) || [...mutation.removedNodes].some(isPromptNode);
-            }
-
-            if (mutation.type === 'characterData') {
-                return !!mutation.target.parentElement?.closest?.(config.selectors.promptListItem);
             }
 
             return false;
