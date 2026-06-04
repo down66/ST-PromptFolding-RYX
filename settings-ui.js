@@ -1,12 +1,10 @@
 import { buildFolderGroups, flattenPromptList, getPromptItems, toggleAllFolders } from './folders.js';
 import {
     config,
-    exportConfigFromPreset,
-    getAllPresetNames,
     getCurrentPresetName,
     getPromptId,
-    importConfigToCurrentPreset,
     loadFromPreset,
+    saveToPreset,
     saveToPresetSoon,
     state,
 } from './state.js';
@@ -14,7 +12,6 @@ import { callGenericPopup, POPUP_TYPE } from '../../../popup.js';
 
 let listContainerRef = null;
 let selectionSnapshot = null;
-let foldRestoreInfo = null;
 
 export async function createSettingsPanel(promptManagerContainer, listContainer) {
     listContainerRef = listContainer;
@@ -43,10 +40,6 @@ function getElements() {
         reset: document.getElementById('ryx-folder-reset'),
         expand: document.getElementById('ryx-folder-expand-all'),
         collapse: document.getElementById('ryx-folder-collapse-all'),
-        copySelect: document.getElementById('ryx-folder-copy-source'),
-        copyButton: document.getElementById('ryx-folder-copy'),
-        foldSettings: document.getElementById('ryx-fold-openai-settings'),
-        debug: document.getElementById('ryx-folder-debug'),
         folderCount: document.getElementById('ryx-folder-count'),
         promptCount: document.getElementById('ryx-prompt-count'),
         currentPreset: document.getElementById('ryx-current-preset'),
@@ -68,22 +61,6 @@ function initSettingsLogic() {
     els.collapse.addEventListener('click', () => toggleAllFolders(listContainerRef, false));
     els.reset.addEventListener('click', handleReset);
 
-    els.foldSettings.checked = localStorage.getItem('ryx-fold-openai-settings') === '1';
-    els.foldSettings.addEventListener('change', () => {
-        localStorage.setItem('ryx-fold-openai-settings', els.foldSettings.checked ? '1' : '0');
-        applyFoldSettings(els.foldSettings.checked);
-    });
-
-    els.debug.addEventListener('change', () => {
-        state.debug = els.debug.checked;
-        saveToPresetSoon();
-        toastr.info(`Debug: ${state.debug ? '开启' : '关闭'}`);
-    });
-
-    els.copySelect.addEventListener('focus', () => loadPresetOptions(els.copySelect));
-    els.copyButton.addEventListener('click', () => copyConfigFromPreset(els));
-
-    loadPresetOptions(els.copySelect);
     loadManifestInfo();
     updateSettingsUI();
 }
@@ -103,8 +80,6 @@ export function updateSettingsUI() {
     const liveFolderCount = [...state.folderIds].filter(id => promptIds.has(id)).length;
 
     els.enabled.checked = state.enabled;
-    els.debug.checked = state.debug;
-    els.foldSettings.checked = localStorage.getItem('ryx-fold-openai-settings') === '1';
     els.folderCount.textContent = String(liveFolderCount);
     els.promptCount.textContent = String(promptItems.length);
     els.currentPreset.textContent = getCurrentPresetName();
@@ -161,7 +136,7 @@ export function startFolderSelection() {
     createFloatingPanel();
     updateFloatingCount();
     updateSettingsUI();
-    toastr.info('勾选要作为文件夹的条目；拖动条目到文件夹下面后点击完成');
+    toastr.info('勾选文件夹标题，然后把条目拖到它下面');
 }
 
 function createFloatingPanel() {
@@ -187,21 +162,21 @@ function createFloatingPanel() {
 function updateFloatingCount() {
     const count = document.getElementById('ryx-folder-float-count');
     if (count) {
-        count.textContent = `已选 ${state.folderIds.size}`;
+        count.textContent = `文件夹 ${state.folderIds.size}`;
     }
 }
 
-function finishFolderSelection() {
+async function finishFolderSelection() {
     state.isSelecting = false;
     selectionSnapshot = null;
 
     document.querySelectorAll('.ryx-folder-picker').forEach(checkbox => checkbox.remove());
     document.getElementById('ryx-folder-float-wrapper')?.remove();
 
-    saveToPresetSoon();
     refreshList();
     updateSettingsUI();
-    toastr.success(`已创建 ${state.folderIds.size} 个文件夹`);
+    await saveToPreset();
+    toastr.success(`已保存 ${state.folderIds.size} 个文件夹`);
 }
 
 export function cancelFolderSelection() {
@@ -233,115 +208,10 @@ async function handleReset() {
     if (!confirmed) return;
 
     loadFromPreset(null);
-    saveToPresetSoon();
     refreshList();
     updateSettingsUI();
+    await saveToPreset();
     toastr.info('已重置文件夹设置');
-}
-
-function loadPresetOptions(selectElement) {
-    if (!selectElement) return;
-
-    const currentPreset = getCurrentPresetName();
-    const presets = getAllPresetNames().filter(name => name !== currentPreset);
-
-    if (presets.length === 0) {
-        selectElement.innerHTML = '<option value="">没有其他预设</option>';
-        return;
-    }
-
-    selectElement.innerHTML = '<option value="">选择来源预设</option>';
-    presets.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        selectElement.appendChild(option);
-    });
-}
-
-async function copyConfigFromPreset(els) {
-    const sourcePreset = els.copySelect.value;
-    if (!sourcePreset) {
-        toastr.warning('请选择来源预设');
-        return;
-    }
-
-    const confirmed = await callGenericPopup(
-        `<div>从「${sourcePreset}」同步文件夹设置到当前预设？</div>`,
-        POPUP_TYPE.CONFIRM,
-        '',
-        { okButton: '同步', cancelButton: '取消' },
-    );
-
-    if (!confirmed) return;
-
-    const configData = await exportConfigFromPreset(sourcePreset);
-    if (!configData) {
-        toastr.warning('来源预设没有文件夹设置');
-        return;
-    }
-
-    const promptItems = getPromptItems(listContainerRef);
-    const result = await importConfigToCurrentPreset(configData, promptItems);
-    refreshList();
-    updateSettingsUI();
-    toastr.success(`同步完成：匹配 ${result.matched} 个，未匹配 ${result.missed} 个`);
-}
-
-export function applyFoldSettings(shouldFold) {
-    const DETAILS_ID = 'ryx-openai-settings-fold';
-
-    if (shouldFold) {
-        if (document.getElementById(DETAILS_ID)) return;
-
-        const rangeBlock = document.getElementById('range_block_openai');
-        if (!rangeBlock) return;
-
-        const details = document.createElement('details');
-        details.id = DETAILS_ID;
-        details.className = 'ryx-openai-fold';
-
-        const summary = document.createElement('summary');
-        summary.textContent = 'OpenAI 参数';
-        details.appendChild(summary);
-
-        const targets = [];
-        const seenTargets = new Set();
-        const pushTarget = (el, parent, next) => {
-            if (!el || seenTargets.has(el)) return;
-            seenTargets.add(el);
-            targets.push({ el, parent, next });
-        };
-
-        pushTarget(rangeBlock, rangeBlock.parentElement, rangeBlock.nextSibling);
-        const openaiSettings = document.getElementById('openai_settings');
-
-        if (openaiSettings) {
-            const firstBlock = openaiSettings.querySelector(':scope > div');
-            const rangeBlockMt = openaiSettings.querySelector(':scope > div.range-block.m-t-1');
-            pushTarget(firstBlock, openaiSettings, firstBlock?.nextSibling);
-            pushTarget(rangeBlockMt, openaiSettings, rangeBlockMt?.nextSibling);
-        }
-
-        foldRestoreInfo = targets.map(target => ({ ...target }));
-        rangeBlock.parentElement.insertBefore(details, rangeBlock);
-        targets.forEach(target => details.appendChild(target.el));
-        return;
-    }
-
-    const details = document.getElementById(DETAILS_ID);
-    if (!details || !foldRestoreInfo) return;
-
-    foldRestoreInfo.slice().reverse().forEach(({ el, parent, next }) => {
-        try {
-            parent.insertBefore(el, next);
-        } catch {
-            parent.appendChild(el);
-        }
-    });
-
-    foldRestoreInfo = null;
-    details.remove();
 }
 
 function loadManifestInfo() {
