@@ -1,43 +1,36 @@
 /*
- * Prompt Folding (日月西 style) for SillyTavern
- * Visual design inspired by 日月西's polished group header style
- * Architecture based on ST-PromptFolding by mingyu
+ * Prompt Folding — 日月西 design
+ * Creates clean card-style group headers with smooth collapse animation.
  */
 
-/* === CSS Custom Properties (auto-adapt to SillyTavern themes) === */
-#completion_prompt_manager_list.pf-grouping-root {
-  --pf-group-text: var(--SmartThemeBodyColor, var(--SmartThemeEmColor, inherit));
-  --pf-group-border: var(--SmartThemeBorderColor, var(--panel-border, currentColor));
-  --pf-group-bg: var(--SmartThemeBlurTintColor, var(--panel-soft-module, transparent));
-  --pf-group-accent: var(--SmartThemeQuoteColor, var(--panel-text-accent, currentColor));
+/* --- CSS Custom Properties (theme-adaptive) --- */
+#completion_prompt_manager_list.ryx-grouping-root {
+  --ryx-group-text: var(--SmartThemeBodyColor, var(--SmartThemeEmColor, inherit));
+  --ryx-group-border: var(--SmartThemeBorderColor, var(--panel-border, currentColor));
+  --ryx-group-bg: var(--SmartThemeBlurTintColor, var(--panel-soft-module, transparent));
+  --ryx-group-accent: var(--SmartThemeQuoteColor, var(--panel-text-accent, currentColor));
 }
 
-/* === Group Container (<details>) === */
-.pf-prompt-group {
-  list-style-type: none !important;
-  margin: 2px 0 !important;
-}
-
-/* === Summary (Header Row) === */
-.pf-prompt-group > summary {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
+/* --- Group Header (synthetic LI inserted before group items) --- */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header {
   position: relative !important;
   list-style: none !important;
   margin: 6px 0 !important;
   padding: 7px 12px !important;
   border-radius: 10px !important;
-  border: 1px solid color-mix(in srgb, var(--pf-group-border) 86%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--ryx-group-border) 86%, transparent) !important;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--pf-group-bg) 92%, transparent) 0%,
-    color-mix(in srgb, var(--pf-group-bg) 84%, transparent) 100%
+    color-mix(in srgb, var(--ryx-group-bg) 92%, transparent) 0%,
+    color-mix(in srgb, var(--ryx-group-bg) 84%, transparent) 100%
   ) !important;
-  color: var(--pf-group-text) !important;
+  color: var(--ryx-group-text) !important;
   box-shadow:
-    0 1px 0 color-mix(in srgb, var(--pf-group-text) 8%, transparent) inset,
-    0 2px 8px color-mix(in srgb, var(--pf-group-text) 16%, transparent) !important;
+    0 1px 0 color-mix(in srgb, var(--ryx-group-text) 8%, transparent) inset,
+    0 2px 8px color-mix(in srgb, var(--ryx-group-text) 16%, transparent) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
   cursor: pointer !important;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -51,158 +44,122 @@
   line-height: 1.2 !important;
 }
 
-/* Summary hover = lift effect */
-.pf-prompt-group > summary:hover {
-  border-color: color-mix(in srgb, var(--pf-group-border) 72%, var(--pf-group-accent) 28%) !important;
+/* Header hover: lift + enhanced shadow */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header:hover {
+  border-color: color-mix(in srgb, var(--ryx-group-border) 72%, var(--ryx-group-accent) 28%) !important;
   transform: translateY(-1px) !important;
   box-shadow:
-    0 1px 0 color-mix(in srgb, var(--pf-group-text) 8%, transparent) inset,
-    0 5px 14px color-mix(in srgb, var(--pf-group-accent) 20%, transparent) !important;
+    0 1px 0 color-mix(in srgb, var(--ryx-group-text) 8%, transparent) inset,
+    0 5px 14px color-mix(in srgb, var(--ryx-group-accent) 20%, transparent) !important;
 }
 
-/* Summary active = press effect */
-.pf-prompt-group > summary:active {
+/* Header active: press down */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header:active {
   transform: translateY(0) scale(.998) !important;
 }
 
-/* Summary focus visible = ring */
-.pf-prompt-group > summary:focus-visible {
+/* Header focus: ring */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header:focus-visible {
   outline: none !important;
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--pf-group-accent) 34%, transparent),
-    0 4px 12px color-mix(in srgb, var(--pf-group-accent) 18%, transparent) !important;
+    0 0 0 2px color-mix(in srgb, var(--ryx-group-accent) 34%, transparent),
+    0 4px 12px color-mix(in srgb, var(--ryx-group-accent) 18%, transparent) !important;
 }
 
-/* Remove native details marker */
-.pf-prompt-group > summary::-webkit-details-marker,
-.pf-prompt-group > summary::marker {
-  display: none !important;
-}
-
-/* === CSS-Only Caret Arrow === */
-.pf-prompt-group > summary::before {
-  content: "" !important;
+/* --- Caret (toggle arrow) --- */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header .ryx-group-caret {
   width: 12px !important;
-  height: 12px !important;
-  flex-shrink: 0 !important;
-  display: inline-block !important;
+  display: inline-flex !important;
+  justify-content: center !important;
+  align-items: center !important;
   opacity: .88 !important;
   transition:
     transform .2s cubic-bezier(.2, .8, .2, 1),
     opacity .16s ease !important;
-  /* CSS triangle (right-pointing = collapsed) */
-  border-left: 5px solid var(--pf-group-text);
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-right: none;
-  margin-left: 1px;
 }
 
-/* Expanded = rotate to down-pointing */
-.pf-prompt-group[open] > summary::before {
+/* Remove any ::before content that might interfere */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header .ryx-group-caret::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Expanded state: rotate caret 90deg */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header:not(.is-collapsed) .ryx-group-caret {
   transform: rotate(90deg) !important;
 }
 
-/* === Header LI Item Inside Summary === */
-.pf-prompt-group > summary > li.completion_prompt_manager_prompt {
+/* --- Group Title --- */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header .ryx-group-title {
   flex: 1 1 auto !important;
-  display: inline-flex !important;
-  align-items: center !important;
-}
-
-/* Header LI gets pointer cursor */
-.pf-prompt-group > summary li.pf-is-group-header a.prompt-manager-inspect-action {
-  cursor: pointer !important;
-}
-
-/* Header name emphasis */
-.pf-prompt-group > summary li.pf-is-group-header .completion_prompt_manager_prompt_name {
+  text-align: left !important;
   font-weight: 650 !important;
 }
 
-/* Hide asterisk icon inside group headers */
-.pf-prompt-group li.pf-is-group-header .fa-asterisk {
-  visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
+/* --- Item Count Badge --- */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header .ryx-group-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 26px !important;
+  height: 20px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--ryx-group-border) 68%, transparent) !important;
+  background: color-mix(in srgb, var(--ryx-group-bg) 74%, var(--ryx-group-accent) 26%) !important;
+  color: color-mix(in srgb, var(--ryx-group-text) 85%, var(--ryx-group-accent) 15%) !important;
+  font-size: .74em !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: .01em !important;
+  opacity: .96 !important;
+  transition:
+    transform .16s ease,
+    background-color .16s ease,
+    border-color .16s ease !important;
 }
 
-/* === Content Area === */
-.pf-prompt-group-content {
-  padding-left: 20px !important;
-  border-left: 1px solid color-mix(in srgb, var(--pf-group-border) 60%, transparent) !important;
-  margin-left: 10px !important;
-  margin-top: 4px !important;
-  margin-bottom: 4px !important;
-  animation: pf-slideDown .2s ease-out;
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-header:hover .ryx-group-count {
+  transform: translateY(-1px) !important;
 }
 
-@keyframes pf-slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* --- Collapsed Items (hidden) --- */
+#completion_prompt_manager_list.ryx-grouping-root .ryx-group-item-collapsed {
+  display: none !important;
 }
 
-/* Empty group placeholder */
-.pf-prompt-group-content:empty::after {
-  content: "(空群组)";
-  color: color-mix(in srgb, var(--pf-group-text) 40%, transparent);
-  font-style: italic;
-  font-size: 0.9em;
-  padding: 5px 0;
-  display: block;
-}
-
-/* === Disabled Group: Gray out child items === */
-li.completion_prompt_manager_prompt.pf-controlled-by-disabled-group > span:not(.prompt_manager_prompt_tokens) {
-  filter: grayscale(80%) !important;
-  opacity: 0.6 !important;
-}
-
-/* === Drag State Visual Feedback === */
-li.completion_prompt_manager_prompt[draggable="true"] {
-  cursor: move;
-}
-
-li.completion_prompt_manager_prompt.pf-dragging {
-  opacity: 0.4;
-  background-color: color-mix(in srgb, var(--pf-group-accent) 10%, transparent);
-}
-
-.pf-prompt-group.pf-dragging-group {
-  outline: 2px dashed color-mix(in srgb, var(--pf-group-accent) 50%, transparent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-li.completion_prompt_manager_prompt[draggable="true"]:hover {
-  background-color: color-mix(in srgb, var(--pf-group-text) 5%, transparent);
-}
-
-/* === Header Layout + Toolbar Buttons === */
-.completion_prompt_manager_header {
-  display: flex !important;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* === Toolbar Controls === */
-.pf-collapse-controls {
+/* --- Toolbar Row --- */
+#completion_prompt_manager_list li.ryx-head-tools-row {
+  list-style: none;
+  margin: 6px 0 8px;
+  padding: 0;
   display: flex;
-  gap: 6px;
+  justify-content: flex-start;
   align-items: center;
-  margin-left: auto;
 }
 
-.pf-collapse-controls .menu_button {
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-name-tools-host {
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  gap: 6px;
+}
+
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-list-tools {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* --- Toolbar Buttons --- */
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn {
   font: inherit;
   color: inherit;
   background: color-mix(in srgb, var(--SmartThemeBlurTintColor, transparent) 75%, transparent);
@@ -211,188 +168,43 @@ li.completion_prompt_manager_prompt[draggable="true"]:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   width: auto;
+  max-width: none;
   height: 24px;
   line-height: 1;
   padding: 0 8px;
   cursor: pointer;
   white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
   flex: 0 0 auto;
-  transition: border-color .18s ease, transform .14s ease, opacity .14s ease;
-  opacity: 0.75;
 }
 
-.pf-collapse-controls .menu_button:hover {
-  opacity: 1 !important;
-  border-color: color-mix(in srgb, var(--SmartThemeBorderColor, currentColor) 72%, var(--pf-group-accent) 28%) !important;
-  transform: translateY(-1px);
-}
-
-.pf-collapse-controls .menu_button:active {
-  transform: scale(.95) !important;
-}
-
-.pf-collapse-controls .menu_button.active {
-  opacity: 1;
-  background: color-mix(in srgb, var(--pf-group-accent) 20%, transparent);
-  border-radius: 4px;
-}
-
-/* === Settings Panel === */
-#pf-settings-panel {
-  position: relative;
-  border: 1px solid color-mix(in srgb, var(--pf-group-border) 50%, transparent);
-  border-radius: 10px;
-  padding: 15px;
-  background: color-mix(in srgb, var(--pf-group-bg) 50%, transparent);
-}
-
-#pf-settings-panel h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1em;
-}
-
-#pf-settings-panel .notes {
-  display: block;
-  margin-bottom: 8px;
-  color: color-mix(in srgb, var(--pf-group-text) 67%, transparent);
-}
-
-#pf-settings-panel textarea {
-  width: 100%;
-  font-family: 'Courier New', monospace;
-}
-
-/* === Help Icon === */
-.pf-help-icon {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: color-mix(in srgb, var(--pf-group-bg) 50%, transparent);
-  color: var(--pf-group-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: help;
-  transition: all .2s ease;
-  border: 1px solid var(--pf-group-border);
-}
-
-.pf-help-icon:hover {
-  background-color: color-mix(in srgb, var(--pf-group-accent) 30%, transparent);
-  transform: scale(1.1);
-}
-
-/* === Version Info === */
-#pf-version-info {
-  position: absolute;
-  bottom: 5px;
-  right: 10px;
-  font-size: 0.7em;
-  color: color-mix(in srgb, var(--pf-group-text) 53%, transparent);
-  opacity: 0.7;
-}
-
-/* === Manual Selection Mode: Checkbox === */
-li.completion_prompt_manager_prompt:has(.pf-header-checkbox) {
-  grid-template-columns: 25px 4fr 80px 45px !important;
-}
-
-.pf-header-checkbox {
-  cursor: pointer;
-  margin: 0;
-  justify-self: center;
-  align-self: center;
-}
-
-/* === Manual Selection: Floating Panel === */
-#pf-float-wrapper {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 12px 0;
-  z-index: 100;
-  pointer-events: none;
-}
-
-#pf-float-panel {
-  pointer-events: all;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--pf-group-border) 60%, transparent);
-  box-shadow: 0 4px 20px var(--SmartThemeFastUIBGColor);
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--SmartThemeFastUIBGColor) 75%, transparent);
-  user-select: none;
-}
-
-#pf-float-count {
-  font-size: 13px;
-  font-weight: bold;
-  padding-right: 4px;
-  white-space: nowrap;
-}
-
-#pf-float-finish {
-  background: rgba(74, 255, 158, 0.85) !important;
-  color: #000 !important;
-  transition: background .15s;
-}
-
-#pf-float-finish:hover {
-  background: rgba(74, 255, 158, 1) !important;
-}
-
-#pf-float-cancel {
-  background: rgba(255, 80, 80, 0.8) !important;
-  color: #fff !important;
-  transition: background .15s;
-}
-
-#pf-float-cancel:hover {
-  background: rgba(255, 80, 80, 1) !important;
-}
-
-/* === Fold Settings: API params collapse === */
-.pf-fold-settings-summary {
-  text-align: center;
-  cursor: pointer;
-  padding: 6px 0 0 0;
-  opacity: 0.6;
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn .ryx-tool-label {
+  display: inline-block;
   font-size: 12px;
-  user-select: none;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
-.pf-fold-settings-summary::-webkit-details-marker,
-.pf-fold-settings-summary::marker {
-  display: none;
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn[data-action="ryx_toggle_grouping"] {
+  min-width: 90px;
 }
 
-/* === Light Theme === */
-@media (prefers-color-scheme: light) {
-  #completion_prompt_manager_list.pf-grouping-root {
-    --pf-group-text: var(--SmartThemeBodyColor, #333);
-    --pf-group-border: var(--SmartThemeBorderColor, #ccc);
-    --pf-group-bg: var(--SmartThemeBlurTintColor, #f5f5f5);
-    --pf-group-accent: var(--SmartThemeQuoteColor, #666);
-  }
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn[data-action="ryx_expand_all"],
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn[data-action="ryx_collapse_all"] {
+  min-width: 70px;
+}
 
-  .pf-prompt-group-content {
-    border-left-color: color-mix(in srgb, var(--pf-group-border) 70%, transparent) !important;
-  }
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn:hover,
+#completion_prompt_manager_list li.ryx-head-tools-row .ryx-tool-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, currentColor) 55%, transparent);
+}
 
-  li.completion_prompt_manager_prompt.pf-dragging {
-    background-color: rgba(74, 158, 255, 0.2);
-  }
+/* Hide toolbar in the list-head row (it only shows inside our injected row) */
+#completion_prompt_manager_list li.completion_prompt_manager_list_head .ryx-name-tools-host {
+  display: none !important;
 }
