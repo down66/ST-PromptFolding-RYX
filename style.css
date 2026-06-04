@@ -14,8 +14,8 @@
     --ryx-accent: #7f99d6;
     --ryx-accent-soft: rgba(127, 153, 214, 0.12);
     --ryx-warn: #ef8585;
-    --ryx-shadow-soft: 0 5px 16px rgba(0, 0, 0, 0.14);
-    --ryx-shadow-tiny: 0 1px 4px rgba(0, 0, 0, 0.12);
+    --ryx-shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --ryx-shadow-tiny: none;
 }
 
 .completion_prompt_manager_header {
@@ -34,7 +34,7 @@
     border: 1px solid var(--ryx-hairline);
     border-radius: 8px;
     background: color-mix(in srgb, var(--ryx-panel) 82%, transparent);
-    box-shadow: var(--ryx-shadow-tiny);
+    box-shadow: none;
 }
 
 .ryx-toolbar-btn,
@@ -88,7 +88,7 @@
 
 .ryx-prompt-folder {
     list-style: none !important;
-    margin: 3px 0 4px;
+    margin: 2px 0 3px;
     border-radius: 8px;
 }
 
@@ -96,14 +96,12 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    min-height: 34px;
-    padding: 2px 6px 2px 4px;
+    min-height: 31px;
+    padding: 1px 5px 1px 4px;
     border: 1px solid color-mix(in srgb, var(--ryx-border) 78%, transparent);
     border-radius: 8px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
-        color-mix(in srgb, var(--ryx-panel-strong) 94%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    background: color-mix(in srgb, var(--ryx-panel-strong) 94%, transparent);
+    box-shadow: none;
     list-style: none;
     user-select: none;
 }
@@ -115,16 +113,14 @@
 
 .ryx-folder-summary:hover {
     border-color: color-mix(in srgb, var(--ryx-accent) 30%, var(--ryx-border));
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-        color-mix(in srgb, var(--ryx-panel-strong) 98%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    background: color-mix(in srgb, var(--ryx-panel-strong) 98%, transparent);
+    box-shadow: none;
 }
 
 .ryx-folder-summary::before {
     content: '';
     width: 2px;
-    height: 17px;
+    height: 15px;
     flex: 0 0 auto;
     border-radius: 999px;
     background: color-mix(in srgb, var(--ryx-accent) 52%, var(--ryx-border));
@@ -134,7 +130,7 @@
 .ryx-folder-chevron {
     width: 24px;
     min-width: 24px;
-    min-height: 26px;
+    min-height: 24px;
     border: none;
     color: color-mix(in srgb, var(--ryx-accent) 84%, var(--ryx-muted));
 }
@@ -150,7 +146,7 @@
 .ryx-folder-summary > li.completion_prompt_manager_prompt {
     flex: 1;
     min-width: 0;
-    min-height: 28px;
+    min-height: 26px;
     margin: 0 !important;
     border: 0 !important;
     background: transparent !important;
@@ -171,8 +167,8 @@
 }
 
 .ryx-prompt-folder-content {
-    margin: 3px 0 1px 8px;
-    padding: 2px 0 2px 8px;
+    margin: 2px 0 1px 8px;
+    padding: 1px 0 1px 8px;
     border-left: 1px solid color-mix(in srgb, var(--ryx-accent) 18%, var(--ryx-border));
 }
 
