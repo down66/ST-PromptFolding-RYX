@@ -1,12 +1,12 @@
 {
-  "display_name": "Prompt Folding (日月西 Style)",
-  "loading_order": 100,
+  "display_name": "Riyuexi Prompt Folders",
+  "loading_order": 1,
   "requires": [],
   "optional": [],
   "js": "index.js",
-  "css": ["collapsible-prompt.css"],
+  "css": ["style.css"],
   "type": "module",
-  "author": "ryx-inspired",
+  "author": "Codex + 日月西 style",
   "version": "1.0.0",
-  "description": "Auto-detect divider symbols (= - #) in prompt names to create collapsible groups. Drag to reorder, click headers to fold. Card-style headers with smooth animation, inspired by riyuexi's elegant design."
+  "homePage": "https://github.com/SillyTavern/SillyTavern"
 }
