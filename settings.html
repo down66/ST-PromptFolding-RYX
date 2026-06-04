@@ -2,16 +2,16 @@
     <div class="ryx-settings-shell">
         <div class="ryx-settings-head">
             <div>
-                <div class="ryx-kicker">Prompt Folder</div>
+                <div class="ryx-kicker">Prompt Folders</div>
                 <h3>提示词文件夹</h3>
             </div>
-            <button type="button" id="ryx-folder-reset" class="ryx-icon-btn" title="重置">
+            <button type="button" id="ryx-folder-reset" class="ryx-icon-btn" title="重置当前预设的文件夹">
                 <i class="fa-solid fa-rotate-left"></i>
             </button>
         </div>
 
         <div class="ryx-status-grid">
-            <div class="ryx-status-item">
+            <div class="ryx-status-item ryx-status-wide">
                 <span>当前预设</span>
                 <b id="ryx-current-preset">-</b>
             </div>
@@ -25,48 +25,28 @@
             </div>
         </div>
 
-        <div class="ryx-action-row">
+        <div class="ryx-action-stack">
             <button type="button" id="ryx-folder-start" class="ryx-main-btn">
                 <i class="fa-solid fa-folder-plus"></i>
                 <span>整理文件夹</span>
             </button>
-            <button type="button" id="ryx-folder-expand-all" class="ryx-soft-btn" title="全部展开">
-                <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-            </button>
-            <button type="button" id="ryx-folder-collapse-all" class="ryx-soft-btn" title="全部收起">
-                <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
-            </button>
+            <div class="ryx-action-row">
+                <button type="button" id="ryx-folder-expand-all" class="ryx-soft-btn">
+                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                    <span>全部展开</span>
+                </button>
+                <button type="button" id="ryx-folder-collapse-all" class="ryx-soft-btn">
+                    <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
+                    <span>全部收起</span>
+                </button>
+            </div>
         </div>
 
-        <div class="ryx-switch-list">
-            <label class="ryx-switch-line">
-                <input type="checkbox" id="ryx-folder-enabled">
-                <span class="ryx-switch-track"></span>
-                <span>启用文件夹</span>
-            </label>
-            <label class="ryx-switch-line">
-                <input type="checkbox" id="ryx-fold-openai-settings">
-                <span class="ryx-switch-track"></span>
-                <span>折叠 OpenAI 参数</span>
-            </label>
-        </div>
-
-        <div class="ryx-copy-row">
-            <select id="ryx-folder-copy-source" class="text_pole">
-                <option value="">选择来源预设</option>
-            </select>
-            <button type="button" id="ryx-folder-copy" class="ryx-soft-btn" title="同步文件夹设置">
-                <i class="fa-solid fa-copy"></i>
-            </button>
-        </div>
-
-        <details class="ryx-tools">
-            <summary>工具</summary>
-            <label class="ryx-check-line">
-                <input type="checkbox" id="ryx-folder-debug">
-                <span>Debug</span>
-            </label>
-        </details>
+        <label class="ryx-switch-line">
+            <input type="checkbox" id="ryx-folder-enabled">
+            <span class="ryx-switch-track"></span>
+            <span>启用文件夹折叠</span>
+        </label>
 
         <div id="ryx-folder-version" class="ryx-version"></div>
     </div>
