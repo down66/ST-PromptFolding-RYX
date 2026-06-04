@@ -3,13 +3,19 @@ import {
     extractPromptName,
     getPromptId,
     log,
-    rememberPromptName,
     saveToPreset,
     saveToPresetSoon,
     state,
 } from './state.js';
 
 let saveTimer = null;
+const dragState = {
+    folder: null,
+    listContainer: null,
+    moved: false,
+    dropTarget: null,
+    dropPlacement: null,
+};
 
 function debounceSave() {
     clearTimeout(saveTimer);
@@ -59,8 +65,6 @@ function cleanPromptItem(item) {
         nameSpan.onclick = null;
         delete nameSpan.dataset.ryxFolderClick;
     }
-
-    rememberPromptName(item);
 }
 
 function setFolderOpen(details, shouldOpen, animate = true) {
@@ -125,6 +129,181 @@ function createChevron() {
     return button;
 }
 
+function isInteractiveTarget(target) {
+    return Boolean(target?.closest?.([
+        'button',
+        'input',
+        'select',
+        'textarea',
+        '.prompt-manager-edit-action',
+        '.prompt-manager-toggle-action',
+        '.prompt-manager-detach-action',
+    ].join(',')));
+}
+
+function clearDropHint() {
+    if (!dragState.dropTarget) return;
+    dragState.dropTarget.classList.remove('ryx-folder-drop-before', 'ryx-folder-drop-after');
+    dragState.dropTarget = null;
+    dragState.dropPlacement = null;
+}
+
+function getTopLevelBlock(target, listContainer) {
+    const folder = target?.closest?.(`.${config.classNames.folder}`);
+    if (folder?.parentElement === listContainer) return folder;
+
+    const promptItem = target?.closest?.(config.selectors.promptListItem);
+    if (promptItem?.parentElement === listContainer) return promptItem;
+
+    return null;
+}
+
+function getDropPlacement(block, clientY) {
+    const summary = block.matches?.(`.${config.classNames.folder}`)
+        ? block.querySelector(':scope > .ryx-folder-summary')
+        : null;
+    const rect = (summary || block).getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+}
+
+function moveDraggedFolder(block, placement) {
+    if (!dragState.folder || block === dragState.folder) return;
+
+    const listContainer = dragState.listContainer;
+    if (!listContainer || block.parentElement !== listContainer) return;
+
+    clearDropHint();
+    block.classList.add(placement === 'before' ? 'ryx-folder-drop-before' : 'ryx-folder-drop-after');
+    dragState.dropTarget = block;
+    dragState.dropPlacement = placement;
+
+    if (placement === 'before') {
+        if (dragState.folder.nextElementSibling !== block) {
+            listContainer.insertBefore(dragState.folder, block);
+            dragState.moved = true;
+        }
+        return;
+    }
+
+    const nextBlock = block.nextElementSibling;
+    if (nextBlock !== dragState.folder) {
+        listContainer.insertBefore(dragState.folder, nextBlock);
+        dragState.moved = true;
+    }
+}
+
+async function syncPromptOrderFromItems(promptItems) {
+    try {
+        const { promptManager } = await import('../../../../scripts/openai.js');
+        const character = promptManager?.activeCharacter;
+        const currentOrder = promptManager?.getPromptOrderForCharacter?.(character);
+
+        if (!character || !Array.isArray(currentOrder) || currentOrder.length === 0) {
+            return false;
+        }
+
+        const idToEntry = new Map(currentOrder.map(entry => [entry.identifier, entry]));
+        const seenIds = new Set();
+        const nextOrder = [];
+
+        promptItems.forEach(item => {
+            const id = getPromptId(item);
+            const entry = idToEntry.get(id);
+            if (!entry || seenIds.has(id)) return;
+            nextOrder.push(entry);
+            seenIds.add(id);
+        });
+
+        currentOrder.forEach(entry => {
+            if (!entry?.identifier || seenIds.has(entry.identifier)) return;
+            nextOrder.push(entry);
+        });
+
+        if (nextOrder.length === 0) return false;
+
+        if (promptManager.removePromptOrderForCharacter && promptManager.addPromptOrderForCharacter) {
+            promptManager.removePromptOrderForCharacter(character);
+            promptManager.addPromptOrderForCharacter(character, nextOrder);
+        } else {
+            currentOrder.splice(0, currentOrder.length, ...nextOrder);
+        }
+
+        await promptManager.saveServiceSettings?.();
+        return true;
+    } catch (error) {
+        console.warn('[RiyuexiPromptFolders] Prompt order sync failed:', error);
+        return false;
+    }
+}
+
+async function commitFolderDrag() {
+    const listContainer = dragState.listContainer;
+    const shouldCommit = dragState.moved && listContainer;
+
+    dragState.folder?.classList.remove('ryx-folder-dragging');
+    listContainer?.classList.remove('ryx-folder-drag-active');
+    document.body.classList.remove('ryx-folder-drag-active');
+    clearDropHint();
+
+    dragState.folder = null;
+    dragState.listContainer = null;
+    dragState.moved = false;
+
+    if (!shouldCommit) return;
+
+    const promptItems = flattenPromptList(listContainer);
+    await syncPromptOrderFromItems(promptItems);
+    buildFolderGroups(listContainer);
+    saveToPresetSoon();
+}
+
+export function setupFolderDrag(listContainer) {
+    if (!listContainer || listContainer.dataset.ryxFolderDragBound === '1') return;
+
+    listContainer.dataset.ryxFolderDragBound = '1';
+
+    listContainer.addEventListener('dragstart', event => {
+        const summary = event.target.closest?.('.ryx-folder-summary');
+        const folder = summary?.closest?.(`.${config.classNames.folder}`);
+        if (!summary || !folder || isInteractiveTarget(event.target) || state.isSelecting) return;
+
+        dragState.folder = folder;
+        dragState.listContainer = listContainer;
+        dragState.moved = false;
+
+        folder.classList.add('ryx-folder-dragging');
+        listContainer.classList.add('ryx-folder-drag-active');
+        document.body.classList.add('ryx-folder-drag-active');
+
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', folder.dataset.folderId || '');
+        event.stopPropagation();
+    });
+
+    listContainer.addEventListener('dragover', event => {
+        if (!dragState.folder || dragState.listContainer !== listContainer) return;
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+
+        const block = getTopLevelBlock(event.target, listContainer);
+        if (!block || block === dragState.folder) return;
+
+        moveDraggedFolder(block, getDropPlacement(block, event.clientY));
+    });
+
+    listContainer.addEventListener('drop', event => {
+        if (!dragState.folder || dragState.listContainer !== listContainer) return;
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    listContainer.addEventListener('dragend', () => {
+        if (!dragState.folder || dragState.listContainer !== listContainer) return;
+        commitFolderDrag().catch(error => console.warn('[RiyuexiPromptFolders] Folder drag commit failed:', error));
+    });
+}
+
 function isPromptEnabled(item) {
     return !item.classList.contains('completion_prompt_manager_prompt_disabled');
 }
@@ -139,8 +318,8 @@ function setFolderCounter(headerItem, childItems) {
     }
 
     tokenCounter.dataset.ryxFolderActiveCount = '1';
-    tokenCounter.textContent = String(enabledCount);
-    tokenCounter.title = `启用条目 ${enabledCount}/${childItems.length}`;
+    tokenCounter.textContent = `${enabledCount}/${childItems.length}`;
+    tokenCounter.title = `已启用条目/全部条目：${enabledCount}/${childItems.length}`;
 }
 
 function createFolderDOM(headerItem, childItems) {
@@ -160,6 +339,8 @@ function createFolderDOM(headerItem, childItems) {
 
     const summary = document.createElement('summary');
     summary.className = 'ryx-folder-summary';
+    summary.draggable = true;
+    summary.title = '拖动可移动整个文件夹，点击名称可展开/收起';
     setFolderCounter(headerItem, childItems);
 
     const chevron = createChevron();
